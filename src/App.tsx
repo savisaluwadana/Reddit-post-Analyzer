@@ -23,6 +23,8 @@ function App() {
   const [posts, setPosts] = useState<RedditPost[]>([]);
   const [errors, setErrors] = useState<string[]>([]);
   const [isLoading, setIsLoading] = useState(false);
+  const [isSavingData, setIsSavingData] = useState(false);
+  const [saveMessage, setSaveMessage] = useState('');
   const [stats, setStats] = useState<SummaryStats | null>(null);
 
   const handleFetch = async () => {
@@ -30,6 +32,7 @@ function App() {
     setErrors([]);
     setPosts([]);
     setStats(null);
+    setSaveMessage('');
 
     try {
       const from = new Date(fromDate);
@@ -38,14 +41,6 @@ function App() {
       
       setPosts(fetchedPosts);
       setErrors(fetchErrors);
-
-      if (fetchedPosts.length > 0) {
-        try {
-          await savePostsToDatabase(fetchedPosts);
-        } catch (saveError: any) {
-          setErrors(prev => [...prev, `Database save failed: ${saveError?.message || 'Unknown error'}`]);
-        }
-      }
       
       if (fetchedPosts.length > 0) {
         const totalScore = fetchedPosts.reduce((acc, p) => acc + p.score, 0);
@@ -62,6 +57,24 @@ function App() {
       setErrors([err.message || 'An unknown error occurred']);
     } finally {
       setIsLoading(false);
+    }
+  };
+
+  const handleSaveData = async () => {
+    if (posts.length === 0) return;
+
+    setIsSavingData(true);
+    setSaveMessage('');
+
+    try {
+      const result = await savePostsToDatabase(posts);
+      setSaveMessage(`Saved ${result.processedCount} posts to MongoDB (${result.insertedCount} inserted, ${result.modifiedCount} updated).`);
+    } catch (saveError: any) {
+      const message = `Database save failed: ${saveError?.message || 'Unknown error'}`;
+      setSaveMessage(message);
+      setErrors(prev => [...prev, message]);
+    } finally {
+      setIsSavingData(false);
     }
   };
 
@@ -88,7 +101,16 @@ function App() {
           isLoading={isLoading}
         />
 
-        {stats && <StatsBar stats={stats} posts={posts} errors={errors} />}
+        {stats && (
+          <StatsBar
+            stats={stats}
+            posts={posts}
+            errors={errors}
+            onSaveData={handleSaveData}
+            isSavingData={isSavingData}
+            saveMessage={saveMessage}
+          />
+        )}
 
         <PostList posts={posts} errors={errors} />
 

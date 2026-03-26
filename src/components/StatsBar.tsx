@@ -5,15 +5,20 @@ interface StatsBarProps {
   stats: SummaryStats;
   posts: RedditPost[];
   errors: string[];
+  onSaveData: () => void;
+  isSavingData: boolean;
+  saveMessage: string;
 }
 
-export const StatsBar: React.FC<StatsBarProps> = ({ stats, posts, errors }) => {
+export const StatsBar: React.FC<StatsBarProps> = ({
+  stats,
+  posts,
+  errors,
+  onSaveData,
+  isSavingData,
+  saveMessage,
+}) => {
   if (stats.totalPosts === 0 && errors.length === 0) return null;
-
-  const escapeCsv = (value: string | number | undefined | null) => {
-    const text = String(value ?? '');
-    return `"${text.replace(/"/g, '""')}"`;
-  };
 
   const copyAll = async () => {
     const textExport = posts.map((post, i) => {
@@ -32,62 +37,6 @@ export const StatsBar: React.FC<StatsBarProps> = ({ stats, posts, errors }) => {
     } catch (err) {
       console.error('Failed to copy all: ', err);
     }
-  };
-
-  const downloadCsv = () => {
-    const headers = [
-      'Rank',
-      'Subreddit',
-      'Title',
-      'Score',
-      'Author',
-      'CreatedUTC',
-      'CreatedISO',
-      'RedditPermalink',
-      'RedditLink',
-      'ExternalUrl',
-      'PostType',
-      'SelfText'
-    ];
-
-    const rows = posts.map((post, i) => {
-      const redditLink = `https://reddit.com${post.permalink}`;
-      const createdIso = new Date(post.created_utc * 1000).toISOString();
-      const postType = post.is_video || post.post_hint === 'hosted:video'
-        ? 'video'
-        : post.is_gallery || post.url.includes('gallery')
-          ? 'gallery'
-          : post.post_hint === 'image' ? 'image' : post.selftext ? 'text' : 'link';
-
-      return [
-        i + 1,
-        post.subreddit,
-        post.title,
-        post.score,
-        post.author,
-        post.created_utc,
-        createdIso,
-        post.permalink,
-        redditLink,
-        post.url,
-        postType,
-        post.selftext ?? ''
-      ];
-    });
-
-    const csv = [headers, ...rows]
-      .map(row => row.map(cell => escapeCsv(cell)).join(','))
-      .join('\n');
-
-    const blob = new Blob([csv], { type: 'text/csv;charset=utf-8;' });
-    const objectUrl = URL.createObjectURL(blob);
-    const link = document.createElement('a');
-    link.href = objectUrl;
-    link.download = `reddit-posts-${new Date().toISOString().slice(0, 10)}.csv`;
-    document.body.appendChild(link);
-    link.click();
-    link.remove();
-    URL.revokeObjectURL(objectUrl);
   };
 
   return (
@@ -120,10 +69,16 @@ export const StatsBar: React.FC<StatsBarProps> = ({ stats, posts, errors }) => {
         <button className="btn-secondary" onClick={copyAll} disabled={posts.length === 0} style={{ minWidth: '140px' }}>
           Copy All As Text
         </button>
-        <button className="btn-primary" onClick={downloadCsv} disabled={posts.length === 0} style={{ minWidth: '140px' }}>
-          Download CSV
+        <button className="btn-primary" onClick={onSaveData} disabled={posts.length === 0 || isSavingData} style={{ minWidth: '140px' }}>
+          {isSavingData ? 'Saving...' : 'Save Data'}
         </button>
       </div>
+
+      {saveMessage && (
+        <div style={{ width: '100%', color: 'var(--text-muted)', fontSize: '0.85rem' }}>
+          {saveMessage}
+        </div>
+      )}
 
     </div>
   );
