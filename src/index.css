@@ -1,0 +1,119 @@
+:root {
+  --bg-color: #0d0d0d;
+  --panel-bg: #141414;
+  --text-main: #e2e2e2;
+  --text-muted: #888888;
+  --reddit-orange: #ff4500;
+  --border-color: #333333;
+  --badge-img: #00d2ff;
+  --badge-vid: #ffd700;
+  --badge-text: #a0a0a0;
+  --badge-link: #4ade80;
+  --badge-gallery: #f472b6;
+  --font-mono: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, "Liberation Mono", "Courier New", monospace;
+  --font-sans: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
+}
+
+* {
+  box-sizing: border-box;
+  margin: 0;
+  padding: 0;
+}
+
+body {
+  background-color: var(--bg-color);
+  color: var(--text-main);
+  font-family: var(--font-mono);
+  -webkit-font-smoothing: antialiased;
+  -moz-osx-font-smoothing: grayscale;
+  line-height: 1.5;
+}
+
+a {
+  color: inherit;
+  text-decoration: none;
+}
+
+a:hover {
+  color: var(--reddit-orange);
+}
+
+button {
+  cursor: pointer;
+  font-family: var(--font-mono);
+}
+
+/* Base utility classes for layouts */
+.container {
+  max-width: 1200px;
+  margin: 0 auto;
+  padding: 2rem;
+}
+
+.header-title {
+  color: var(--reddit-orange);
+  font-size: 2rem;
+  margin-bottom: 0.5rem;
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+  font-weight: 700;
+}
+
+.header-desc {
+  color: var(--text-muted);
+  margin-bottom: 2rem;
+  font-size: 0.9rem;
+}
+
+/* Card aesthetics */
+.card {
+  background-color: var(--panel-bg);
+  border: 1px solid var(--border-color);
+  border-radius: 4px;
+}
+
+/* Form elements */
+.input-base {
+  background: transparent;
+  border: 1px solid var(--border-color);
+  color: var(--text-main);
+  padding: 0.5rem 0.75rem;
+  font-family: var(--font-mono);
+  outline: none;
+  font-size: 0.9rem;
+  border-radius: 2px;
+}
+.input-base:focus {
+  border-color: var(--reddit-orange);
+}
+
+.btn-primary {
+  background-color: var(--reddit-orange);
+  color: #fff;
+  border: none;
+  padding: 0.6rem 1.2rem;
+  font-weight: bold;
+  font-size: 0.9rem;
+  text-transform: uppercase;
+  border-radius: 2px;
+  transition: opacity 0.2s;
+}
+.btn-primary:hover {
+  opacity: 0.9;
+}
+.btn-primary:active {
+  transform: translateY(1px);
+}
+
+.btn-secondary {
+  background-color: transparent;
+  color: var(--text-main);
+  border: 1px solid var(--border-color);
+  padding: 0.6rem 1.2rem;
+  font-size: 0.9rem;
+  border-radius: 2px;
+  transition: all 0.2s;
+}
+.btn-secondary:hover {
+  border-color: var(--text-main);
+}
