@@ -6,6 +6,7 @@ import { createEvidenceRouter } from './evidenceRoutes.js';
 import { createHostIntelligenceRouter } from './hostIntelligenceRoutes.js';
 import { createPainScanRouter } from './painScanRoutes.js';
 import { createResearchJobRouter } from './researchJobRoutes.js';
+import { createResearchSearchRouter } from './researchSearchRoutes.js';
 
 dotenv.config();
 
@@ -26,6 +27,7 @@ app.use('/api/pain-scans', createPainScanRouter());
 app.use('/api/evidence', createEvidenceRouter());
 app.use('/api/host-intelligence', createHostIntelligenceRouter());
 app.use('/api/research-jobs', createResearchJobRouter());
+app.use('/api/research-search', createResearchSearchRouter());
 
 const redditPostSchema = new mongoose.Schema(
   {
@@ -120,6 +122,11 @@ app.get('/api/health', (_req, res) => {
       'autonomous-research-jobs',
       'coverage-gap-loop',
       'opportunity-validation',
+      'deep-search-planning',
+      'deep-scrape-orchestration',
+      'search-memory',
+      'evidence-independence',
+      'contradiction-hunting',
     ],
     llmMode: 'mcp-host',
     llmApiKeyRequired: false,
