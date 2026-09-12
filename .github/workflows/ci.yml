@@ -32,6 +32,19 @@ jobs:
         run: |
           node --check server/index.js
           node --check server/painScanRoutes.js
+          node --check server/evidenceRoutes.js
+          node --check server/generalPainEngine.js
+          node --check mcp/server.js
+
+      - name: MCP stdio smoke test
+        run: |
+          OUTPUT=$(printf '%s\n%s\n' \
+            '{"jsonrpc":"2.0","id":1,"method":"initialize","params":{"protocolVersion":"2025-11-25","capabilities":{},"clientInfo":{"name":"ci","version":"1.0.0"}}}' \
+            '{"jsonrpc":"2.0","id":2,"method":"tools/list","params":{}}' \
+            | node mcp/server.js 2>/tmp/mcp-stderr.log)
+          echo "$OUTPUT" | grep '"protocolVersion":"2025-11-25"'
+          echo "$OUTPUT" | grep '"name":"ingest_evidence"'
+          echo "$OUTPUT" | grep '"name":"analyze_pain_points"'
 
       - name: Build
         run: npm run build
