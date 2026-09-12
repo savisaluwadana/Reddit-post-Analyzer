@@ -11,6 +11,11 @@ export interface RedditPost {
   selftext?: string;
   is_video?: boolean;
   is_gallery?: boolean;
+  num_comments?: number;
+  upvote_ratio?: number;
+  total_awards_received?: number;
+  domain?: string;
+  link_flair_text?: string;
 }
 
 export interface SummaryStats {
@@ -22,4 +27,44 @@ export interface SummaryStats {
   highestScoringTitle: string;
 }
 
+export interface PostIntelligence {
+  ageHours: number;
+  scorePerHour: number;
+  commentsPerHour: number;
+  discussionRatio: number;
+  painScore: number;
+  buyingIntentScore: number;
+  questionScore: number;
+  opportunityScore: number;
+  signals: string[];
+}
+
+export interface TopicInsight {
+  topic: string;
+  mentions: number;
+  score: number;
+  comments: number;
+}
+
+export interface SubredditInsight {
+  subreddit: string;
+  posts: number;
+  avgScore: number;
+  avgComments: number;
+  avgOpportunity: number;
+}
+
+export interface DashboardInsights {
+  totalComments: number;
+  avgComments: number;
+  avgOpportunity: number;
+  painSignalPosts: number;
+  buyingIntentPosts: number;
+  fastMovingPosts: number;
+  topics: TopicInsight[];
+  subreddits: SubredditInsight[];
+}
+
 export type TimeFilter = 'hour' | 'day' | 'week' | 'month' | 'year' | 'all';
+export type SortMode = 'opportunity' | 'score' | 'comments' | 'velocity' | 'newest';
+export type SignalFilter = 'all' | 'pain' | 'buying-intent' | 'question' | 'fast-moving' | 'discussion-heavy';

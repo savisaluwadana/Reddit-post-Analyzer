@@ -1,11 +1,9 @@
 import type { RedditPost, TimeFilter } from '../types';
 
-/**
- * Maps the distance between `from` date and today to a Reddit time filter.
- */
+/** Maps the distance between `from` date and today to Reddit's supported top-feed window. */
 export function mapDateToTimeFilter(fromDate: Date): TimeFilter {
   const now = new Date();
-  const diffMs = now.getTime() - fromDate.getTime();
+  const diffMs = Math.max(0, now.getTime() - fromDate.getTime());
   const diffHours = diffMs / (1000 * 60 * 60);
 
   if (diffHours <= 1) return 'hour';
@@ -16,15 +14,9 @@ export function mapDateToTimeFilter(fromDate: Date): TimeFilter {
   return 'all';
 }
 
-/**
- * Fetches top posts from a single subreddit.
- */
 async function fetchSubreddit(subreddit: string, limit: number, timeFilter: TimeFilter): Promise<RedditPost[]> {
   const safeSubreddit = encodeURIComponent(subreddit.trim());
-  const query = `t=${timeFilter}&limit=${limit}`;
-
-  // In dev, Vite proxy (`/reddit`) avoids CORS/network failures.
-  // In production, direct Reddit URL remains available as a fallback.
+  const query = `t=${timeFilter}&limit=${Math.min(Math.max(limit, 1), 100)}&raw_json=1`;
   const urls = [
     `/reddit/r/${safeSubreddit}/top.json?${query}`,
     `https://www.reddit.com/r/${safeSubreddit}/top.json?${query}`,
@@ -35,9 +27,7 @@ async function fetchSubreddit(subreddit: string, limit: number, timeFilter: Time
   for (const url of urls) {
     try {
       const response = await fetch(url, {
-        headers: {
-          Accept: 'application/json',
-        },
+        headers: { Accept: 'application/json' },
       });
 
       if (!response.ok) {
@@ -46,19 +36,26 @@ async function fetchSubreddit(subreddit: string, limit: number, timeFilter: Time
       }
 
       const data = await response.json();
-      return data.data.children.map((child: any) => ({
+      const children = Array.isArray(data?.data?.children) ? data.data.children : [];
+
+      return children.map((child: any) => ({
         id: child.data.id,
         subreddit: child.data.subreddit,
         title: child.data.title,
-        score: child.data.score,
-        author: child.data.author,
-        created_utc: child.data.created_utc,
+        score: Number(child.data.score ?? 0),
+        author: child.data.author ?? '[deleted]',
+        created_utc: Number(child.data.created_utc ?? 0),
         permalink: child.data.permalink,
         url: child.data.url,
         post_hint: child.data.post_hint,
         selftext: child.data.selftext,
-        is_video: child.data.is_video,
-        is_gallery: child.data.is_gallery,
+        is_video: Boolean(child.data.is_video),
+        is_gallery: Boolean(child.data.is_gallery),
+        num_comments: Number(child.data.num_comments ?? 0),
+        upvote_ratio: Number(child.data.upvote_ratio ?? 0),
+        total_awards_received: Number(child.data.total_awards_received ?? 0),
+        domain: child.data.domain,
+        link_flair_text: child.data.link_flair_text,
       }));
     } catch (error) {
       lastError = error as Error;
@@ -68,45 +65,44 @@ async function fetchSubreddit(subreddit: string, limit: number, timeFilter: Time
   throw new Error(lastError?.message || 'Failed to fetch subreddit data');
 }
 
-/**
- * Fetches from multiple subreddits and merges/filters/sorts them.
- */
+/** Fetches several communities in parallel, then deduplicates and strictly applies the requested date range. */
 export async function fetchAllPosts(
   subreddits: string[],
   limit: number,
   fromDate: Date,
   toDate: Date
 ): Promise<{ posts: RedditPost[]; errors: string[] }> {
+  if (Number.isNaN(fromDate.getTime()) || Number.isNaN(toDate.getTime())) {
+    throw new Error('Please provide a valid date range.');
+  }
+
+  if (fromDate > toDate) {
+    throw new Error('The start date must be before the end date.');
+  }
+
+  const cleanSubreddits = [...new Set(subreddits.map((sub) => sub.trim().replace(/^\/?r\//i, '')).filter(Boolean))];
   const timeFilter = mapDateToTimeFilter(fromDate);
-  
-  const promises = subreddits.map(sub => fetchSubreddit(sub, limit, timeFilter));
-  const results = await Promise.allSettled(promises);
-  
-  const posts: RedditPost[] = [];
+  const results = await Promise.allSettled(cleanSubreddits.map((sub) => fetchSubreddit(sub, limit, timeFilter)));
+
+  const postMap = new Map<string, RedditPost>();
   const errors: string[] = [];
 
   results.forEach((result, index) => {
     if (result.status === 'fulfilled') {
-      posts.push(...result.value);
+      result.value.forEach((post) => postMap.set(post.id, post));
     } else {
-      errors.push(`Error fetching r/${subreddits[index]}: ${(result.reason as Error).message}`);
+      errors.push(`Error fetching r/${cleanSubreddits[index]}: ${(result.reason as Error).message}`);
     }
   });
 
-  // Client side filtering strictly within exact dates provided
   const fromMs = fromDate.getTime() / 1000;
-  
-  // End of day for `toDate`
   const toDateEnd = new Date(toDate);
   toDateEnd.setHours(23, 59, 59, 999);
   const toMs = toDateEnd.getTime() / 1000;
 
-  const filteredPosts = posts.filter(
-    post => post.created_utc >= fromMs && post.created_utc <= toMs
-  );
+  const posts = [...postMap.values()]
+    .filter((post) => post.created_utc >= fromMs && post.created_utc <= toMs)
+    .sort((a, b) => b.score - a.score);
 
-  // Merge and sort all results by score
-  filteredPosts.sort((a, b) => b.score - a.score);
-
-  return { posts: filteredPosts, errors };
+  return { posts, errors };
 }
