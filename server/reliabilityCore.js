@@ -3,6 +3,14 @@ const TRACKING_QUERY_KEYS = new Set([
   'gclid', 'fbclid', 'mc_cid', 'mc_eid', 'ref', 'ref_src', 'source',
 ]);
 
+const JOB_STAGE_ORDER = new Map([
+  ['claimed', 0],
+  ['collecting', 1],
+  ['gap-research', 2],
+  ['semantic-analysis', 3],
+  ['opportunity-validation', 4],
+]);
+
 const STRONG_COMMERCIAL_PATTERNS = [
   /\bwilling to pay\b/i,
   /\bwould pay\b/i,
@@ -91,10 +99,12 @@ export function computeAnnotationProgress(candidateIds = [], annotationIds = [])
 }
 
 export function canHeartbeatJob(currentStatus, requestedStatus) {
-  const active = new Set(['claimed', 'collecting', 'gap-research', 'semantic-analysis', 'opportunity-validation']);
-  if (!active.has(currentStatus)) return false;
+  const currentStage = JOB_STAGE_ORDER.get(currentStatus);
+  if (currentStage === undefined) return false;
   if (!requestedStatus) return true;
-  return active.has(requestedStatus);
+  const requestedStage = JOB_STAGE_ORDER.get(requestedStatus);
+  if (requestedStage === undefined) return false;
+  return requestedStage >= currentStage;
 }
 
 function compactText(value = '') {
