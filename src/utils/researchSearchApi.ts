@@ -9,6 +9,11 @@ export interface ResearchSearchQualityReport {
     duplicationRate: number;
     identityGroupCount: number;
     largestIdentityGroupShare: number;
+    independentStoryCount?: number;
+    storyGroupCount?: number;
+    largestStoryGroupSize?: number;
+    largestStoryGroupShare?: number;
+    effectiveIndependentCount?: number;
     duplicateExamples: Array<{ evidenceId: string; duplicateOf: string; similarity: number }>;
   };
   signals: {
@@ -21,6 +26,7 @@ export interface ResearchSearchQualityReport {
     namedSources: number;
     communities: number;
     identifiableAuthors: number;
+    identityGroups?: number;
   };
   deepScraping: {
     runs: number;
