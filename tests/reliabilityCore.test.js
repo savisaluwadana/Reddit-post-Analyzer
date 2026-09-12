@@ -65,6 +65,17 @@ test('strong commercial signals exclude generic subscription mentions', () => {
   assert.ok(strong.quantifiedImpact >= 1);
 });
 
+test('negated recommendations are not counted as positive counter-evidence', () => {
+  const negative = analyzeResearchSignalsStrict([
+    { text: 'I do not recommend it. I am not happy with it and it is not worth the price.' },
+    { text: 'It is not easy to use and support was slow.' },
+  ]);
+  assert.equal(negative.contradictionCandidates, 0);
+
+  const positive = analyzeResearchSignalsStrict([{ text: 'I highly recommend it; it works fine for us and is worth the price.' }]);
+  assert.equal(positive.contradictionCandidates, 1);
+});
+
 test('validation coverage requires exactly one validation per opportunity', () => {
   assert.equal(validateOpportunityCoverage(['a', 'b'], ['a', 'b']).valid, true);
   assert.deepEqual(validateOpportunityCoverage(['a', 'b'], ['a']).missing, ['b']);
