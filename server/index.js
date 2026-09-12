@@ -5,6 +5,8 @@ import mongoose from 'mongoose';
 import { createEvidenceRouter } from './evidenceRoutes.js';
 import { createHostIntelligenceRouter } from './hostIntelligenceRoutes.js';
 import { createPainScanRouter } from './painScanRoutes.js';
+import { createResearchJobRouter } from './researchJobRoutes.js';
+import { createResearchSearchRouter } from './researchSearchRoutes.js';
 
 dotenv.config();
 
@@ -24,6 +26,8 @@ app.use(express.json({ limit: '2mb' }));
 app.use('/api/pain-scans', createPainScanRouter());
 app.use('/api/evidence', createEvidenceRouter());
 app.use('/api/host-intelligence', createHostIntelligenceRouter());
+app.use('/api/research-jobs', createResearchJobRouter());
+app.use('/api/research-search', createResearchSearchRouter());
 
 const redditPostSchema = new mongoose.Schema(
   {
@@ -109,7 +113,21 @@ app.get('/api/health', (_req, res) => {
     ok: true,
     database: mongoose.connection.readyState === 1 ? 'connected' : 'disconnected',
     snapshotRetentionDays,
-    capabilities: ['reddit-collector', 'cross-source-evidence', 'pain-intelligence', 'mcp-bridge', 'host-llm-intelligence'],
+    capabilities: [
+      'reddit-collector',
+      'cross-source-evidence',
+      'pain-intelligence',
+      'mcp-bridge',
+      'host-llm-intelligence',
+      'autonomous-research-jobs',
+      'coverage-gap-loop',
+      'opportunity-validation',
+      'deep-search-planning',
+      'deep-scrape-orchestration',
+      'search-memory',
+      'evidence-independence',
+      'contradiction-hunting',
+    ],
     llmMode: 'mcp-host',
     llmApiKeyRequired: false,
   });
@@ -117,34 +135,18 @@ app.get('/api/health', (_req, res) => {
 
 app.get('/api/posts', async (req, res) => {
   try {
-    const {
-      subreddit,
-      q,
-      minScore = '0',
-      minComments = '0',
-      sort = 'createdUtc',
-      order = 'desc',
-      limit = '100',
-    } = req.query;
-
+    const { subreddit, q, minScore = '0', minComments = '0', sort = 'createdUtc', order = 'desc', limit = '100' } = req.query;
     const filter = {
       score: { $gte: Math.max(0, Number(minScore) || 0) },
       numComments: { $gte: Math.max(0, Number(minComments) || 0) },
     };
-
     if (typeof subreddit === 'string' && subreddit.trim()) filter.subreddit = normalizeSubreddit(subreddit);
     if (typeof q === 'string' && q.trim()) filter.$text = { $search: q.trim().slice(0, 180) };
-
     const allowedSortFields = new Set(['createdUtc', 'score', 'numComments', 'lastFetchedAt']);
     const sortField = allowedSortFields.has(String(sort)) ? String(sort) : 'createdUtc';
     const sortDirection = order === 'asc' ? 1 : -1;
     const safeLimit = Math.min(Math.max(Number(limit) || 100, 1), 500);
-
-    const posts = await RedditPostModel.find(filter)
-      .sort({ [sortField]: sortDirection })
-      .limit(safeLimit)
-      .lean();
-
+    const posts = await RedditPostModel.find(filter).sort({ [sortField]: sortDirection }).limit(safeLimit).lean();
     return res.json({ count: posts.length, posts });
   } catch (error) {
     console.error('Failed to query posts:', error);
@@ -166,13 +168,10 @@ app.post('/api/projects', async (req, res) => {
   try {
     const name = String(req.body?.name || '').trim().slice(0, 80);
     if (!name) return res.status(400).json({ message: 'Project name is required' });
-
     const subreddits = normalizeStringList(req.body?.subreddits, 50, 64).map(normalizeSubreddit).filter(Boolean);
     if (subreddits.length === 0) return res.status(400).json({ message: 'Add at least one subreddit to the project' });
-
     const allowedSignals = new Set(['all', 'pain', 'buying-intent', 'question', 'fast-moving', 'discussion-heavy']);
     const allowedSortModes = new Set(['opportunity', 'score', 'comments', 'velocity', 'newest']);
-
     const project = await ResearchProjectModel.create({
       name,
       description: String(req.body?.description || '').trim().slice(0, 280),
@@ -183,7 +182,6 @@ app.post('/api/projects', async (req, res) => {
       signalFilter: allowedSignals.has(req.body?.signalFilter) ? req.body.signalFilter : 'all',
       sortMode: allowedSortModes.has(req.body?.sortMode) ? req.body.sortMode : 'opportunity',
     });
-
     return res.status(201).json({ project: project.toObject() });
   } catch (error) {
     console.error('Failed to create research project:', error);
@@ -208,10 +206,7 @@ app.get('/api/trends', async (req, res) => {
     const days = Math.min(Math.max(Number(req.query.days) || 14, 1), 90);
     const since = new Date(Date.now() - days * 24 * 60 * 60 * 1000);
     const match = { capturedAt: { $gte: since } };
-
-    if (typeof req.query.subreddit === 'string' && req.query.subreddit.trim()) {
-      match.subreddit = normalizeSubreddit(req.query.subreddit);
-    }
+    if (typeof req.query.subreddit === 'string' && req.query.subreddit.trim()) match.subreddit = normalizeSubreddit(req.query.subreddit);
 
     const points = await PostSnapshotModel.aggregate([
       { $match: match },
@@ -299,7 +294,6 @@ app.post('/api/posts/bulk', async (req, res) => {
     const posts = req.body?.posts;
     if (!Array.isArray(posts)) return res.status(400).json({ message: 'Request body must include posts[]' });
     if (posts.length > 1000) return res.status(400).json({ message: 'Maximum bulk size is 1000 posts' });
-
     const now = new Date();
     const capturedHour = Math.floor(now.getTime() / (60 * 60 * 1000));
     const validPosts = posts.filter((post) => post?.id && post?.subreddit && post?.title);
@@ -331,7 +325,6 @@ app.post('/api/posts/bulk', async (req, res) => {
         upsert: true,
       },
     }));
-
     if (operations.length === 0) return res.status(400).json({ message: 'No valid posts to save' });
 
     const snapshotOperations = validPosts.map((post) => ({
@@ -355,7 +348,6 @@ app.post('/api/posts/bulk', async (req, res) => {
       RedditPostModel.bulkWrite(operations, { ordered: false }),
       PostSnapshotModel.bulkWrite(snapshotOperations, { ordered: false }),
     ]);
-
     return res.json({
       message: 'Posts and history snapshots saved successfully',
       receivedCount: posts.length,

@@ -1,6 +1,7 @@
 import { useEffect, useMemo, useState } from 'react';
 import type { HostResearchGraph, HostResearchRun } from '../types/hostIntelligence';
 import { getHostResearchGraph, getHostResearchRun, listHostResearchRuns } from '../utils/hostIntelligenceApi';
+import { ResearchJobsPanel } from './ResearchJobsPanel';
 
 function compactScore(value: number | undefined) {
   return Number.isFinite(value) ? Math.round(value ?? 0) : 0;
@@ -73,21 +74,23 @@ export function HostIntelligencePanel() {
       <div className="host-intelligence-header">
         <div>
           <div className="eyebrow">Host-model intelligence</div>
-          <h2>Semantic research without a model API key</h2>
+          <h2>Autonomous research without a model API key</h2>
           <p>
-            Codex or Claude Code does the semantic reasoning inside the connected MCP host session. The platform stores the resulting JTBD, entities, competitors, semantic clusters, opportunities and research graph.
+            Queue a market question in the UI. Codex or Claude Code can claim it through MCP, browse the web, fill evidence gaps, perform semantic/JTBD reasoning, validate competitors and pricing, then persist the final opportunity verdicts here.
           </p>
         </div>
         <div className="no-key-badge"><span /> No model API key</div>
       </div>
 
       <div className="host-workflow-strip">
-        <span>Collect evidence</span><i>→</i><span>Host annotates batches</span><i>→</i><span>Semantic merge</span><i>→</i><span>Opportunity synthesis</span><i>→</i><span>Research graph</span>
+        <span>Queue question</span><i>→</i><span>Collect evidence</span><i>→</i><span>Fill coverage gaps</span><i>→</i><span>Semantic merge</span><i>→</i><span>Validate market</span>
       </div>
+
+      <ResearchJobsPanel />
 
       <div className="host-run-toolbar">
         <label className="field-group">
-          <span>Host research run</span>
+          <span>Semantic host research run</span>
           <select
             className="input-base"
             value={selectedRun?._id ?? ''}
@@ -108,10 +111,10 @@ export function HostIntelligencePanel() {
         <div className="host-empty-state">
           <strong>No semantic host run has been submitted yet.</strong>
           <p>
-            Connect Codex or Claude Code through MCP, collect evidence, then ask it to follow <code>research_protocol</code>. The host will create the run and persist its semantic reasoning here.
+            Queue a research job above, then connect Codex or Claude Code through MCP and call <code>claim_research_job</code>. The host receives the entire autonomous workflow and will create the semantic run when coverage is ready.
           </p>
           <div className="host-tool-sequence">
-            <span>start_llm_research_run</span><span>get_llm_evidence_batch</span><span>submit_llm_annotations</span><span>get_llm_synthesis_pack</span><span>submit_llm_synthesis</span>
+            <span>claim_research_job</span><span>evaluate_research_job_coverage</span><span>start_job_semantic_analysis</span><span>submit_llm_synthesis</span><span>submit_opportunity_validation</span>
           </div>
         </div>
       )}
@@ -135,7 +138,7 @@ export function HostIntelligencePanel() {
 
           {selectedRun.status !== 'complete' && (
             <div className="host-progress-note">
-              This run is still <strong>{selectedRun.status.replaceAll('-', ' ')}</strong>. The MCP host should continue fetching evidence batches and submit final synthesis when annotation is complete.
+              This semantic run is still <strong>{selectedRun.status.replaceAll('-', ' ')}</strong>. The MCP host should continue fetching evidence batches and submit final synthesis when annotation is complete.
             </div>
           )}
 
