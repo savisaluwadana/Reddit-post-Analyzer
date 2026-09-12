@@ -22,6 +22,19 @@ The Pain Point Lab goes beyond post sentiment and looks for evidence that a prob
 
 The pain score is intentionally transparent. A high score requires multiple useful signals rather than generic negative sentiment.
 
+### Versioned pain history
+
+Pain research can now be saved as bounded MongoDB snapshots. Each snapshot stores the scan summary, top pain clusters, personas/keywords and a small high-value evidence set.
+
+The latest two saved scans are compared automatically so pain clusters can be classified as:
+
+- **New** — present now but not in the previous saved scan
+- **Rising** — pain score increased materially
+- **Persistent** — remains important at roughly the same strength
+- **Falling** — pain score decreased materially
+
+This turns one-off research into longitudinal pain intelligence and makes it possible to distinguish an emerging problem from a long-running complaint.
+
 ### Live conversation intelligence
 
 - Fetches top posts across multiple subreddits and exact date ranges
@@ -110,15 +123,11 @@ The Vite development server proxies `/api` to the Node API and `/reddit` to Redd
 GET /api/health
 ```
 
-Returns database connectivity and snapshot-retention information.
-
-### Store Reddit posts + history
+### Store Reddit posts + hourly engagement history
 
 ```text
 POST /api/posts/bulk
 ```
-
-Posts are upserted by Reddit ID. The same request also upserts one historical snapshot per post for the current hour.
 
 ### Query stored posts
 
@@ -128,12 +137,6 @@ GET /api/posts
 
 Supported query parameters include `subreddit`, `q`, `minScore`, `minComments`, `sort`, `order` and `limit`.
 
-Example:
-
-```text
-/api/posts?subreddit=webdev&minComments=20&sort=numComments&order=desc&limit=50
-```
-
 ### Saved research projects
 
 ```text
@@ -142,24 +145,31 @@ POST /api/projects
 DELETE /api/projects/:id
 ```
 
-### Historical trends
+### Historical post momentum
 
 ```text
 GET /api/trends?days=30
 GET /api/trends?days=30&subreddit=kubernetes
 ```
 
-The response contains daily aggregate points plus the posts with the largest score/comment movement in that window.
+### Versioned pain scans
+
+```text
+GET /api/pain-scans?limit=20
+POST /api/pain-scans
+DELETE /api/pain-scans/:id
+```
+
+`GET /api/pain-scans` returns recent saved scans plus a latest-vs-previous comparison for the strongest clusters. Stored evidence is intentionally capped so a pain snapshot stays useful without becoming an unbounded copy of Reddit threads.
 
 ## Data model
 
-The application currently uses three MongoDB collections:
+The application currently uses four MongoDB collections:
 
 - `RedditPost` — latest known state for every collected post
 - `PostSnapshot` — hourly historical engagement snapshots
 - `ResearchProject` — reusable research configurations
-
-Deep comment evidence is analyzed in the research session and can be exported as JSON. A future persistence layer can store versioned pain scans for long-term comparison.
+- `PainScan` — versioned pain research snapshots and bounded supporting evidence
 
 ## Validation
 
@@ -168,9 +178,11 @@ Pull requests run GitHub Actions CI with:
 ```text
 npm ci
 npm run lint
+node --check server/index.js
+node --check server/painScanRoutes.js
 npm run build
 ```
 
 ## Current direction
 
-The project is evolving into a dedicated pain-point and opportunity research system. Logical next phases include authenticated Reddit server-side ingestion, scheduled project scans, pain-cluster history, alerts when a problem crosses a confidence/intent threshold, semantic clustering and optional grounded LLM summaries.
+The project is evolving into a dedicated pain-point and opportunity research system. Strong next phases include authenticated Reddit server-side ingestion, scheduled project scans, threshold alerts, semantic clustering for paraphrased complaints, competitor/product entity extraction and optional grounded LLM synthesis on top of the collected evidence.
