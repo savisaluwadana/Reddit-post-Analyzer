@@ -1,6 +1,6 @@
 const TRACKING_QUERY_KEYS = new Set([
   'utm_source', 'utm_medium', 'utm_campaign', 'utm_term', 'utm_content',
-  'gclid', 'fbclid', 'mc_cid', 'mc_eid', 'ref', 'ref_src', 'source',
+  'gclid', 'fbclid', 'mc_cid', 'mc_eid', 'ref_src',
 ]);
 
 const JOB_STAGE_ORDER = new Map([
@@ -209,15 +209,18 @@ export function summarizeStoryIndependence(items = [], duplicateIds = new Set())
 }
 
 export function validateOpportunityCoverage(expectedIds = [], submittedIds = []) {
-  const expected = new Set(expectedIds.map(String));
+  const expectedList = expectedIds.map(String);
+  const expected = new Set(expectedList);
   const submitted = submittedIds.map(String);
   const uniqueSubmitted = new Set(submitted);
   const unknown = [...uniqueSubmitted].filter((id) => !expected.has(id));
   const missing = [...expected].filter((id) => !uniqueSubmitted.has(id));
+  const duplicateExpectedCount = expectedList.length - expected.size;
   return {
-    valid: unknown.length === 0 && missing.length === 0 && uniqueSubmitted.size === submitted.length,
+    valid: duplicateExpectedCount === 0 && unknown.length === 0 && missing.length === 0 && uniqueSubmitted.size === submitted.length,
     unknown,
     missing,
     duplicateCount: submitted.length - uniqueSubmitted.size,
+    duplicateExpectedCount,
   };
 }
