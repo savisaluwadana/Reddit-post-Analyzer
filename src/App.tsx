@@ -6,6 +6,7 @@ import { HostIntelligencePanel } from './components/HostIntelligencePanel';
 import { IntelligencePanel } from './components/IntelligencePanel';
 import { PainPointLab } from './components/PainPointLab';
 import { PostList } from './components/PostList';
+import { QualityIntelligencePanel } from './components/QualityIntelligencePanel';
 import { ResearchProjectsPanel } from './components/ResearchProjectsPanel';
 import { ResearchToolbar } from './components/ResearchToolbar';
 import { StatsBar } from './components/StatsBar';
@@ -223,6 +224,7 @@ function App() {
       <main>
         <CrossSourceIntelligencePanel />
         <HostIntelligencePanel />
+        <QualityIntelligencePanel />
 
         <div className="source-connector-divider">
           <span>Built-in source connector</span>

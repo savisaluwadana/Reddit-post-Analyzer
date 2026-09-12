@@ -44,8 +44,11 @@ jobs:
           node --check server/reliabilityCore.js
           node --check server/reliabilityRoutes.js
           node --check server/integrityGuardRoutes.js
+          node --check server/qualityIntelligenceCore.js
+          node --check server/qualityIntelligenceRoutes.js
           node --check mcp/hostTools.js
           node --check mcp/searchTools.js
+          node --check mcp/qualityTools.js
           node --check mcp/server.js
 
       - name: MCP stdio smoke test
@@ -76,8 +79,15 @@ jobs:
           echo "$OUTPUT" | grep '"name":"get_llm_synthesis_pack"'
           echo "$OUTPUT" | grep '"name":"submit_llm_synthesis"'
           echo "$OUTPUT" | grep '"name":"get_research_graph"'
+          echo "$OUTPUT" | grep '"name":"get_research_quality_summary"'
+          echo "$OUTPUT" | grep '"name":"refresh_market_entities"'
+          echo "$OUTPUT" | grep '"name":"get_cluster_consensus_pack"'
+          echo "$OUTPUT" | grep '"name":"submit_cluster_consensus"'
+          echo "$OUTPUT" | grep '"name":"get_market_sizing_pack"'
+          echo "$OUTPUT" | grep '"name":"submit_market_sizing_assessment"'
           echo "$OUTPUT" | grep 'No model API key is required'
           echo "$OUTPUT" | grep 'source-aware search plans'
+          echo "$OUTPUT" | grep 'sourced market sizing'
           ! grep -Eq '"(openai|@anthropic-ai/sdk)"' package.json
 
       - name: Build

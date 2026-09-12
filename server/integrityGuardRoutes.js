@@ -1,5 +1,6 @@
 import express from 'express';
 import mongoose from 'mongoose';
+import { createQualityIntelligenceRouter } from './qualityIntelligenceRoutes.js';
 
 const COLLECTION_CLOSED_STATUSES = new Set(['semantic-analysis', 'opportunity-validation', 'complete', 'failed']);
 
@@ -16,6 +17,11 @@ function serializeJob(job) {
 
 export function createIntegrityGuardRouter() {
   const router = express.Router();
+
+  // The integrity router is already mounted at /api before the feature routers, so it
+  // also provides the post-synthesis quality-intelligence extension without changing
+  // the stable server bootstrap order.
+  router.use('/quality-intelligence', createQualityIntelligenceRouter());
 
   // Coverage is a collection-phase operation. Once semantic work starts, refreshing
   // coverage must never rewind the persisted lifecycle back to gap-research.
