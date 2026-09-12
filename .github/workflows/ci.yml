@@ -48,10 +48,13 @@ jobs:
           node --check server/qualityIntelligenceRoutes.js
           node --check server/opportunityOsCore.js
           node --check server/opportunityOsRoutes.js
+          node --check server/scrapeIntelligenceCore.js
+          node --check server/scrapeIntelligenceRoutes.js
           node --check mcp/hostTools.js
           node --check mcp/searchTools.js
           node --check mcp/qualityTools.js
           node --check mcp/opportunityTools.js
+          node --check mcp/scrapeTools.js
           node --check mcp/server.js
 
       - name: MCP stdio smoke test
@@ -95,6 +98,13 @@ jobs:
           echo "$OUTPUT" | grep '"name":"get_opportunity_execution_pack"'
           echo "$OUTPUT" | grep '"name":"submit_build_spec"'
           echo "$OUTPUT" | grep '"name":"submit_gtm_plan"'
+          echo "$OUTPUT" | grep '"name":"get_source_scrape_contract"'
+          echo "$OUTPUT" | grep '"name":"start_scrape_session"'
+          echo "$OUTPUT" | grep '"name":"add_scrape_candidates"'
+          echo "$OUTPUT" | grep '"name":"get_next_scrape_batch"'
+          echo "$OUTPUT" | grep '"name":"record_scrape_page_result"'
+          echo "$OUTPUT" | grep '"name":"get_scrape_session_summary"'
+          echo "$OUTPUT" | grep '"name":"reopen_scrape_session"'
           echo "$OUTPUT" | grep 'No model API key is required'
           echo "$OUTPUT" | grep 'source-aware search plans'
           echo "$OUTPUT" | grep 'sourced market sizing'
