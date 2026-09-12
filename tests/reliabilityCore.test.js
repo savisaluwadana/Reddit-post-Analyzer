@@ -24,9 +24,12 @@ test('annotation progress only counts evidence eligible for the run', () => {
   assert.equal(computeAnnotationProgress([], []).complete, false);
 });
 
-test('heartbeat transitions cannot bypass dedicated terminal state endpoints', () => {
+test('heartbeat transitions are active-only and monotonic', () => {
   assert.equal(canHeartbeatJob('claimed', 'collecting'), true);
   assert.equal(canHeartbeatJob('gap-research', 'semantic-analysis'), true);
+  assert.equal(canHeartbeatJob('semantic-analysis', 'opportunity-validation'), true);
+  assert.equal(canHeartbeatJob('semantic-analysis', 'collecting'), false);
+  assert.equal(canHeartbeatJob('opportunity-validation', 'gap-research'), false);
   assert.equal(canHeartbeatJob('claimed', 'complete'), false);
   assert.equal(canHeartbeatJob('complete', 'collecting'), false);
   assert.equal(canHeartbeatJob('queued', 'claimed'), false);
