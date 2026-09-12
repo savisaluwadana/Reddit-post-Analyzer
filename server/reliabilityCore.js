@@ -155,6 +155,14 @@ export function evidenceIdentityKey(item = {}) {
   return [source, domain, community, author || 'anonymous'].join('|');
 }
 
+function positiveCounterText(text) {
+  return text
+    .replace(/\b(?:do not|don't|would not|wouldn't|cannot|can't|not)\s+(?:really\s+|still\s+)?recommend(?:ed)?\b/gi, ' ')
+    .replace(/\bnot\s+(?:really\s+)?happy with\b/gi, ' ')
+    .replace(/\bnot\s+worth the (?:price|cost)\b/gi, ' ')
+    .replace(/\bnot\s+easy to (?:use|set up|setup)\b/gi, ' ');
+}
+
 export function analyzeResearchSignalsStrict(items = []) {
   let strongCommercial = 0;
   let workaround = 0;
@@ -164,7 +172,8 @@ export function analyzeResearchSignalsStrict(items = []) {
     const text = evidenceText(item);
     if (STRONG_COMMERCIAL_PATTERNS.some((pattern) => pattern.test(text))) strongCommercial += 1;
     if (WORKAROUND_PATTERNS.some((pattern) => pattern.test(text))) workaround += 1;
-    if (POSITIVE_COUNTER_PATTERNS.some((pattern) => pattern.test(text))) contradictionCandidates += 1;
+    const counterText = positiveCounterText(text);
+    if (POSITIVE_COUNTER_PATTERNS.some((pattern) => pattern.test(counterText))) contradictionCandidates += 1;
     if (/\b\d+(?:\.\d+)?\s*(?:hours?|hrs?|minutes?|mins?|days?|weeks?|months?|%|percent|dollars?|usd|gbp|eur)\b|[$£€]\s?\d+/i.test(text)) quantifiedImpact += 1;
   }
   return { strongCommercial, workaround, contradictionCandidates, quantifiedImpact };
