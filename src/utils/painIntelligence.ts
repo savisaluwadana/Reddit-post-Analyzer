@@ -77,7 +77,7 @@ function scoreDimension(text: string, terms: string[], multiplier: number) {
 
 function evidenceFromText(
   sourceType: 'post' | 'comment',
-  source: RedditPost | RedditComment,
+  _source: RedditPost | RedditComment,
   postId: string,
   subreddit: string,
   author: string,
@@ -100,29 +100,15 @@ function evidenceFromText(
     .sort((a, b) => b.matches - a.matches)
     .slice(0, 2);
 
-  if (categories.length === 0) {
-    categories.push({ category: 'usability', matches: 1 });
-  }
+  if (categories.length === 0) categories.push({ category: 'usability', matches: 1 });
 
   const personas = detectPersonas(text);
   const keywords = extractKeywords(rawText);
   const cleanText = rawText.replace(/\s+/g, ' ').trim().slice(0, 420);
 
   return categories.map(({ category }) => ({
-    sourceType,
-    postId,
-    subreddit,
-    author,
-    text: cleanText,
-    permalink,
-    score,
-    category,
-    severity,
-    commercialIntent,
-    urgency,
-    workaroundBurden,
-    personas,
-    keywords,
+    sourceType, postId, subreddit, author, text: cleanText, permalink, score, category,
+    severity, commercialIntent, urgency, workaroundBurden, personas, keywords,
   }));
 }
 
@@ -153,19 +139,12 @@ function createReason(cluster: Omit<PainCluster, 'opportunityReason'>) {
 function buildClusters(evidence: PainEvidence[]) {
   const categoryGroups = new Map<PainCategory, PainEvidence[]>();
   evidence.forEach((item) => categoryGroups.set(item.category, [...(categoryGroups.get(item.category) ?? []), item]));
-
   const clusters: PainCluster[] = [];
 
   categoryGroups.forEach((items, category) => {
     const documentFrequency = new Map<string, number>();
     items.forEach((item) => new Set(item.keywords).forEach((keyword) => documentFrequency.set(keyword, (documentFrequency.get(keyword) ?? 0) + 1)));
-
-    const recurringKeywords = [...documentFrequency.entries()]
-      .filter(([, count]) => count >= 2)
-      .sort((a, b) => b[1] - a[1])
-      .slice(0, 4)
-      .map(([keyword]) => keyword);
-
+    const recurringKeywords = [...documentFrequency.entries()].filter(([, count]) => count >= 2).sort((a, b) => b[1] - a[1]).slice(0, 4).map(([keyword]) => keyword);
     const buckets = new Map<string, PainEvidence[]>();
     items.forEach((item) => {
       const primary = recurringKeywords.find((keyword) => item.keywords.includes(keyword)) ?? 'general';
@@ -203,40 +182,23 @@ function buildClusters(evidence: PainEvidence[]) {
         .slice(0, 6);
 
       const partial: Omit<PainCluster, 'opportunityReason'> = {
-        id: `${category}:${primary}`,
-        category,
-        label,
-        painScore,
-        severity,
-        recurrence,
-        commercialIntent,
-        urgency,
-        workaroundBurden,
-        confidence,
-        evidenceCount: unique.length,
-        distinctPosts,
-        distinctSubreddits,
-        personas,
-        keywords,
-        evidence: rankedEvidence,
+        id: `${category}:${primary}`, category, label, painScore, severity, recurrence, commercialIntent,
+        urgency, workaroundBurden, confidence, evidenceCount: unique.length, distinctPosts, distinctSubreddits,
+        personas, keywords, evidence: rankedEvidence,
       };
       clusters.push({ ...partial, opportunityReason: createReason(partial) });
     });
   });
 
-  return clusters
-    .filter((cluster) => cluster.evidenceCount >= 1)
-    .sort((a, b) => (b.painScore + b.confidence * 0.15) - (a.painScore + a.confidence * 0.15));
+  return clusters.filter((cluster) => cluster.evidenceCount >= 1).sort((a, b) => (b.painScore + b.confidence * 0.15) - (a.painScore + a.confidence * 0.15));
 }
 
 export function buildPainScan(posts: RedditPost[], comments: RedditComment[] = [], errors: string[] = []): PainScanResult {
   const evidence: PainEvidence[] = [];
-
   posts.forEach((post) => {
     const text = `${post.title}\n${post.selftext ?? ''}`;
     evidence.push(...evidenceFromText('post', post, post.id, post.subreddit, post.author, text, `https://reddit.com${post.permalink}`, post.score));
   });
-
   comments.forEach((comment) => {
     evidence.push(...evidenceFromText('comment', comment, comment.postId, comment.subreddit, comment.author, comment.body, comment.permalink ? `https://reddit.com${comment.permalink}` : undefined, comment.score));
   });
@@ -245,7 +207,6 @@ export function buildPainScan(posts: RedditPost[], comments: RedditComment[] = [
   evidence.forEach((item) => uniqueSourceEvidence.set(sourceKey(item), item));
   const uniqueSources = [...uniqueSourceEvidence.values()];
   const clusters = buildClusters(evidence);
-
   const categoryMap = new Map<PainCategory, PainCluster[]>();
   clusters.forEach((cluster) => categoryMap.set(cluster.category, [...(categoryMap.get(cluster.category) ?? []), cluster]));
   const categories: PainCategoryBreakdown[] = [...categoryMap.entries()]
