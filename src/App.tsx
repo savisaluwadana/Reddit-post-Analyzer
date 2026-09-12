@@ -10,6 +10,7 @@ import { PostList } from './components/PostList';
 import { QualityIntelligencePanel } from './components/QualityIntelligencePanel';
 import { ResearchProjectsPanel } from './components/ResearchProjectsPanel';
 import { ResearchToolbar } from './components/ResearchToolbar';
+import { ScrapeIntelligencePanel } from './components/ScrapeIntelligencePanel';
 import { StatsBar } from './components/StatsBar';
 import { TrendPanel } from './components/TrendPanel';
 import type {
@@ -219,12 +220,13 @@ function App() {
         <p className="header-desc">
           Turn public conversations, reviews, forums, issues, support threads and community discussions into evidence-backed pain points, jobs-to-be-done, competitor intelligence and product opportunities.
         </p>
-        <div className="hero-note">MCP-hosted LLM reasoning • No model API key • Multi-source evidence • Semantic clustering • Validation experiments • Opportunity OS</div>
+        <div className="hero-note">MCP-hosted LLM reasoning • No model API key • Adaptive public-web crawl intelligence • Semantic clustering • Validation experiments • Opportunity OS</div>
       </header>
 
       <main>
         <CrossSourceIntelligencePanel />
         <HostIntelligencePanel />
+        <ScrapeIntelligencePanel />
         <QualityIntelligencePanel />
         <OpportunityOsPanel />
 

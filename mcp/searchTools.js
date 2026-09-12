@@ -1,3 +1,5 @@
+import { callScrapeIntelligenceTool, scrapeIntelligenceTools } from './scrapeTools.js';
+
 export const researchSearchTools = [
   {
     name: 'get_research_search_plan',
@@ -88,6 +90,7 @@ export const researchSearchTools = [
       },
     },
   },
+  ...scrapeIntelligenceTools,
 ];
 
 export async function callResearchSearchTool(name, args, requestJson) {
@@ -102,9 +105,10 @@ export async function callResearchSearchTool(name, args, requestJson) {
     });
     if (!claimed?.job?._id) return { handled: true, value: claimed };
     const claimedJobId = encodeURIComponent(claimed.job._id);
-    const [searchPlan, quality] = await Promise.all([
+    const [searchPlan, quality, scrapeSession] = await Promise.all([
       requestJson(`/api/research-search/jobs/${claimedJobId}/plan`),
       requestJson(`/api/research-search/jobs/${claimedJobId}/quality`),
+      requestJson(`/api/scrape-intelligence/jobs/${claimedJobId}/session`, { method: 'POST', body: JSON.stringify({ policy: {} }) }),
     ]);
     return {
       handled: true,
@@ -112,16 +116,21 @@ export async function callResearchSearchTool(name, args, requestJson) {
         ...claimed,
         searchPlan: searchPlan.plan,
         searchQuality: quality.report,
+        scrapeSession: scrapeSession.session,
         executionProtocol: {
           ...(claimed.executionProtocol || {}),
           sequence: [
             'Call/get the supplied searchPlan first. Execute multiple distinct missions rather than one broad query.',
-            `Ingest useful evidence with ingest_evidence using batch_id=${claimed.job.batchId}. Preserve canonical URLs, dates, source/community, and metadata.first_hand where known.`,
-            'For evidence-rich roots, call get_deep_scrape_plan, traverse the public conversation/context, ingest distinct evidence-bearing claims, then call record_deep_scrape_result.',
+            'For every search result set, submit useful public URL candidates with add_scrape_candidates instead of opening results in arbitrary order.',
+            'Use get_next_scrape_batch to browse the highest-information URLs first. Call get_source_scrape_contract for each source class before deep traversal.',
+            `Ingest useful evidence with ingest_evidence using batch_id=${claimed.job.batchId}. Preserve canonical URLs, dates, source/community, metadata.first_hand and metadata.root_url where known.`,
+            'After every browsed page/thread branch, call record_scrape_page_result with extraction quality fields, evidence yield, duplicate yield, access state, and newly discovered candidates.',
+            'Never bypass authentication, paywalls, robots/access restrictions, or anti-bot challenges. Record the access boundary and move on.',
+            'Use get_scrape_session_summary regularly. Respect adaptive stop decisions when marginal yield collapses, duplicates dominate, access boundaries saturate, the frontier is exhausted, or the evidence target is reached.',
             'Call record_research_search_progress after each search pass so repeated queries and URLs are avoided.',
             'Call evaluate_research_job_coverage AND evaluate_research_evidence_quality. Fill both coverage gaps and quality gaps.',
             'Explicitly search for contradictory/positive evidence, quantified impact, strong commercial behavior, and independent sources before synthesis.',
-            'Repeat search/deep-scrape passes until the evidence-quality gate is ready or the research pass cap is reached.',
+            'Repeat search/frontier/deep-scrape passes until the evidence-quality gate is ready or the research pass cap is reached.',
             'Then call start_job_semantic_analysis and complete the host semantic workflow.',
             'Finally validate competitors, pricing, switching barriers, and substitutes before submit_opportunity_validation. If synthesis produced zero opportunities, use complete_research_job_without_opportunities instead.',
           ],
@@ -137,15 +146,18 @@ export async function callResearchSearchTool(name, args, requestJson) {
       body: JSON.stringify({ advancePass: args.advance_pass !== false }),
     });
     const quality = await requestJson(`/api/research-search/jobs/${jobId}/quality`);
+    let scrape = null;
+    try { scrape = await requestJson(`/api/scrape-intelligence/jobs/${jobId}/summary`); } catch { scrape = null; }
     return {
       handled: true,
       value: {
         ...coverage,
         searchQuality: quality.report,
+        scrapeQuality: scrape?.session || null,
         qualityReadyForSynthesis: Boolean(quality.report?.readyForSynthesis),
         recommendedNextStep: quality.report?.readyForSynthesis
           ? 'Proceed when the coverage gate is also ready, otherwise close remaining coverage gaps.'
-          : 'Continue search/deep-scrape work using the returned quality gaps before semantic synthesis.',
+          : 'Continue search/frontier/deep-scrape work using the returned quality gaps before semantic synthesis.',
       },
     };
   }
@@ -215,6 +227,9 @@ export async function callResearchSearchTool(name, args, requestJson) {
       }),
     };
   }
+
+  const scrapeTool = await callScrapeIntelligenceTool(name, args, requestJson);
+  if (scrapeTool.handled) return scrapeTool.value;
 
   return { handled: false, value: null };
 }

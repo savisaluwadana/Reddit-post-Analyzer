@@ -48,6 +48,12 @@ How the durable research queue, leases, coverage loop, semantic-analysis stage a
 
 Read this when you are changing or extending job orchestration.
 
+### [Adaptive Scraping Intelligence](SCRAPING_INTELLIGENCE.md)
+
+How the adaptive crawl frontier canonicalizes and ranks public URLs, applies source-specific traversal contracts, scores extraction quality, preserves provenance, respects access boundaries and stops when marginal evidence yield collapses.
+
+Read this when you want the strongest public-web evidence collection workflow rather than simple search-result browsing.
+
 ### [Deep Research Workflow](DEEP_RESEARCH.md)
 
 How search missions, search memory, entity branching, deep-scrape contracts, evidence independence, contradiction hunting and research-quality scoring work.
@@ -99,6 +105,8 @@ MCP
     ↓
 AUTONOMOUS_RESEARCH
     ↓
+SCRAPING_INTELLIGENCE
+    ↓
 QUALITY_INTELLIGENCE
     ↓
 OPPORTUNITY_OS
@@ -108,6 +116,8 @@ For someone developing the research engine:
 
 ```text
 USER_GUIDE
+    ↓
+SCRAPING_INTELLIGENCE
     ↓
 DEEP_RESEARCH
     ↓
@@ -127,7 +137,15 @@ Research question
       ↓
 Research job
       ↓
-MCP host search / browse
+source-aware search missions
+      ↓
+adaptive crawl frontier
+      ↓
+canonical URL dedup + priority ranking
+      ↓
+source-specific public-page traversal
+      ↓
+extraction-quality + marginal-yield checks
       ↓
 Evidence ingestion
       ↓
@@ -157,4 +175,4 @@ Build / Validate / Watch / Stop
 MVP specification + first-customer GTM
 ```
 
-The platform itself does not require an OpenAI, Anthropic or embedding API key. The connected MCP host supplies browsing and semantic reasoning from its own session.
+The platform itself does not require an OpenAI, Anthropic, embedding, scraping, or proxy API key. The connected MCP host supplies browsing and semantic reasoning from its own session.
