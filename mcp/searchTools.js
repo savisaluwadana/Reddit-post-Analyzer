@@ -80,6 +80,63 @@ export const researchSearchTools = [
 export async function callResearchSearchTool(name, args, requestJson) {
   const jobId = args?.job_id ? encodeURIComponent(args.job_id) : '';
 
+  // claim_research_job is declared by hostTools, but intercepted here so every claimed
+  // job immediately receives the richer deep-search plan and quality gate.
+  if (name === 'claim_research_job') {
+    const claimed = await requestJson('/api/research-jobs/claim', {
+      method: 'POST',
+      body: JSON.stringify({ harness: args.harness || 'mcp-host', leaseMinutes: args.lease_minutes || 30 }),
+    });
+    if (!claimed?.job?._id) return { handled: true, value: claimed };
+    const claimedJobId = encodeURIComponent(claimed.job._id);
+    const [searchPlan, quality] = await Promise.all([
+      requestJson(`/api/research-search/jobs/${claimedJobId}/plan`),
+      requestJson(`/api/research-search/jobs/${claimedJobId}/quality`),
+    ]);
+    return {
+      handled: true,
+      value: {
+        ...claimed,
+        searchPlan: searchPlan.plan,
+        searchQuality: quality.report,
+        executionProtocol: {
+          ...(claimed.executionProtocol || {}),
+          sequence: [
+            'Call/get the supplied searchPlan first. Execute multiple distinct missions rather than one broad query.',
+            `Ingest useful evidence with ingest_evidence using batch_id=${claimed.job.batchId}. Preserve canonical URLs, dates, source/community, and metadata.first_hand where known.`,
+            'For evidence-rich roots, call get_deep_scrape_plan, traverse the public conversation/context, ingest distinct evidence-bearing claims, then call record_deep_scrape_result.',
+            'Call record_research_search_progress after each search pass so repeated queries and URLs are avoided.',
+            'Call evaluate_research_job_coverage AND evaluate_research_evidence_quality. Fill both coverage gaps and quality gaps.',
+            'Explicitly search for contradictory/positive evidence, quantified impact, strong commercial behavior, and independent sources before synthesis.',
+            'Repeat search/deep-scrape passes until the evidence-quality gate is ready or the research pass cap is reached.',
+            'Then call start_job_semantic_analysis and complete the host semantic workflow.',
+            'Finally validate competitors, pricing, switching barriers, and substitutes before submit_opportunity_validation.',
+          ],
+        },
+      },
+    };
+  }
+
+  // Also enrich the existing coverage tool with the deeper evidence-quality report.
+  if (name === 'evaluate_research_job_coverage') {
+    const coverage = await requestJson(`/api/research-jobs/${jobId}/coverage`, {
+      method: 'POST',
+      body: JSON.stringify({ advancePass: args.advance_pass !== false }),
+    });
+    const quality = await requestJson(`/api/research-search/jobs/${jobId}/quality`);
+    return {
+      handled: true,
+      value: {
+        ...coverage,
+        searchQuality: quality.report,
+        qualityReadyForSynthesis: Boolean(quality.report?.readyForSynthesis),
+        recommendedNextStep: quality.report?.readyForSynthesis
+          ? 'Proceed when the coverage gate is also ready, otherwise close remaining coverage gaps.'
+          : 'Continue search/deep-scrape work using the returned quality gaps before semantic synthesis.',
+      },
+    };
+  }
+
   if (name === 'get_research_search_plan') {
     return { handled: true, value: await requestJson(`/api/research-search/jobs/${jobId}/plan`) };
   }
