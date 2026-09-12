@@ -83,11 +83,17 @@ test('validation coverage requires exactly one validation per opportunity', () =
   assert.equal(validateOpportunityCoverage(['a', 'b'], ['a', 'b']).valid, true);
   assert.deepEqual(validateOpportunityCoverage(['a', 'b'], ['a']).missing, ['b']);
   assert.equal(validateOpportunityCoverage(['a'], ['a', 'a']).duplicateCount, 1);
-  assert.deepEqual(validateOpportunityCoverage([], []), { valid: true, unknown: [], missing: [], duplicateCount: 0 });
+  assert.deepEqual(validateOpportunityCoverage([], []), { valid: true, unknown: [], missing: [], duplicateCount: 0, duplicateExpectedCount: 0 });
 });
 
-test('query and URL normalization remove superficial differences', () => {
+test('duplicate synthesized opportunity ids invalidate validation coverage', () => {
+  const result = validateOpportunityCoverage(['opp-a', 'opp-a'], ['opp-a']);
+  assert.equal(result.valid, false);
+  assert.equal(result.duplicateExpectedCount, 1);
+});
+
+test('query and URL normalization remove superficial differences without deleting semantic source parameters', () => {
   assert.equal(normalizeQueryKey('"Dental Billing" OR complaints'), normalizeQueryKey('dental billing complaints'));
-  const normalized = normalizeUrl('https://WWW.Example.com/path/?utm_source=x&b=2&a=1#section');
-  assert.equal(normalized, 'https://example.com/path?a=1&b=2');
+  const normalized = normalizeUrl('https://WWW.Example.com/path/?utm_source=x&source=issues&b=2&a=1#section');
+  assert.equal(normalized, 'https://example.com/path?a=1&b=2&source=issues');
 });
