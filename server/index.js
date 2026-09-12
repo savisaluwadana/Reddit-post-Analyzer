@@ -5,6 +5,7 @@ import mongoose from 'mongoose';
 import { createEvidenceRouter } from './evidenceRoutes.js';
 import { createHostIntelligenceRouter } from './hostIntelligenceRoutes.js';
 import { createPainScanRouter } from './painScanRoutes.js';
+import { createReliabilityRouter } from './reliabilityRoutes.js';
 import { createResearchJobRouter } from './researchJobRoutes.js';
 import { createResearchSearchRouter } from './researchSearchRoutes.js';
 
@@ -23,6 +24,9 @@ if (!mongoUri) {
 
 app.use(cors({ origin: allowedOrigin }));
 app.use(express.json({ limit: '2mb' }));
+// Reliability guards intentionally run before the legacy feature routers. They intercept
+// state-sensitive endpoints while allowing all unaffected requests to fall through.
+app.use('/api', createReliabilityRouter());
 app.use('/api/pain-scans', createPainScanRouter());
 app.use('/api/evidence', createEvidenceRouter());
 app.use('/api/host-intelligence', createHostIntelligenceRouter());
@@ -127,6 +131,8 @@ app.get('/api/health', (_req, res) => {
       'search-memory',
       'evidence-independence',
       'contradiction-hunting',
+      'multi-batch-evidence-membership',
+      'research-state-invariants',
     ],
     llmMode: 'mcp-host',
     llmApiKeyRequired: false,
