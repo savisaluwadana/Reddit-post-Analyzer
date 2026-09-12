@@ -18,6 +18,18 @@ export interface RedditPost {
   link_flair_text?: string;
 }
 
+export interface RedditComment {
+  id: string;
+  postId: string;
+  subreddit: string;
+  author: string;
+  body: string;
+  score: number;
+  created_utc: number;
+  permalink?: string;
+  depth: number;
+}
+
 export interface SummaryStats {
   totalPosts: number;
   subredditsSearched: number;
@@ -118,4 +130,113 @@ export interface TrendResponse {
   days: number;
   points: TrendPoint[];
   topMovers: TrendMover[];
+}
+
+export type PainCategory =
+  | 'manual-work'
+  | 'integration'
+  | 'reliability'
+  | 'performance'
+  | 'cost'
+  | 'usability'
+  | 'visibility'
+  | 'security-compliance'
+  | 'setup-onboarding'
+  | 'workflow-process'
+  | 'missing-capability'
+  | 'support'
+  | 'data-migration';
+
+export interface PainEvidence {
+  sourceType: 'post' | 'comment';
+  postId: string;
+  subreddit: string;
+  author: string;
+  text: string;
+  permalink?: string;
+  score: number;
+  category: PainCategory;
+  severity: number;
+  commercialIntent: number;
+  urgency: number;
+  workaroundBurden: number;
+  personas: string[];
+  keywords: string[];
+}
+
+export interface PainCluster {
+  id: string;
+  category: PainCategory;
+  label: string;
+  painScore: number;
+  severity: number;
+  recurrence: number;
+  commercialIntent: number;
+  urgency: number;
+  workaroundBurden: number;
+  confidence: number;
+  evidenceCount: number;
+  distinctPosts: number;
+  distinctSubreddits: number;
+  personas: string[];
+  keywords: string[];
+  evidence: PainEvidence[];
+  opportunityReason: string;
+}
+
+export interface PainCategoryBreakdown {
+  category: PainCategory;
+  evidenceCount: number;
+  painScore: number;
+}
+
+export interface PainScanResult {
+  generatedAt: string;
+  postsScanned: number;
+  commentsScanned: number;
+  painPosts: number;
+  painComments: number;
+  highIntentEvidence: number;
+  workaroundEvidence: number;
+  clusters: PainCluster[];
+  categories: PainCategoryBreakdown[];
+  topPersonas: Array<{ persona: string; mentions: number }>;
+  errors: string[];
+}
+
+export interface PersistedPainScan {
+  _id: string;
+  name: string;
+  generatedAt: string;
+  subreddits: string[];
+  postsScanned: number;
+  commentsScanned: number;
+  painPosts: number;
+  painComments: number;
+  highIntentEvidence: number;
+  workaroundEvidence: number;
+  clusters: PainCluster[];
+  categories: PainCategoryBreakdown[];
+  topPersonas: Array<{ persona: string; mentions: number }>;
+  createdAt: string;
+}
+
+export type PainTrendStatus = 'new' | 'rising' | 'persistent' | 'falling';
+
+export interface PainTrendDelta {
+  id: string;
+  label: string;
+  category: PainCategory;
+  currentScore: number;
+  previousScore: number;
+  delta: number;
+  currentConfidence: number;
+  commercialIntent: number;
+  recurrence: number;
+  status: PainTrendStatus;
+}
+
+export interface PainHistoryResponse {
+  scans: PersistedPainScan[];
+  comparison: PainTrendDelta[];
 }

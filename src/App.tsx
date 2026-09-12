@@ -2,6 +2,7 @@ import { useEffect, useMemo, useState } from 'react';
 import { Controls } from './components/Controls';
 import { CsvVisualizer } from './components/CsvVisualizer';
 import { IntelligencePanel } from './components/IntelligencePanel';
+import { PainPointLab } from './components/PainPointLab';
 import { PostList } from './components/PostList';
 import { ResearchProjectsPanel } from './components/ResearchProjectsPanel';
 import { ResearchToolbar } from './components/ResearchToolbar';
@@ -208,12 +209,12 @@ function App() {
   return (
     <div className="container app-shell">
       <header className="hero-header">
-        <div className="hero-kicker">Reddit research intelligence</div>
+        <div className="hero-kicker">Reddit pain-point intelligence</div>
         <h1 className="header-title">Conversation Signal Lab</h1>
         <p className="header-desc">
-          Discover high-signal Reddit conversations, recurring pain points, buying intent, fast-moving discussions and community-level opportunities.
+          Discover recurring pain, costly manual work, unmet needs, switching intent and high-value product opportunities across Reddit conversations.
         </p>
-        <div className="hero-note">Transparent heuristic scoring • Saved research projects • Historical momentum tracking</div>
+        <div className="hero-note">Transparent scoring • Saved research projects • Historical momentum • Comment-level deep pain scans</div>
       </header>
 
       <main>
@@ -282,6 +283,7 @@ function App() {
               resultCount={displayedPosts.length}
             />
             <IntelligencePanel insights={insights} posts={displayedPosts} />
+            <PainPointLab posts={displayedPosts} />
           </>
         )}
 

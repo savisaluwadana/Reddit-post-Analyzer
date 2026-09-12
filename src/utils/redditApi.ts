@@ -1,5 +1,33 @@
 import type { RedditPost, TimeFilter } from '../types';
 
+interface RedditListingChild {
+  data: {
+    id: string;
+    subreddit: string;
+    title: string;
+    score?: number;
+    author?: string;
+    created_utc?: number;
+    permalink: string;
+    url: string;
+    post_hint?: string;
+    selftext?: string;
+    is_video?: boolean;
+    is_gallery?: boolean;
+    num_comments?: number;
+    upvote_ratio?: number;
+    total_awards_received?: number;
+    domain?: string;
+    link_flair_text?: string;
+  };
+}
+
+interface RedditListingResponse {
+  data?: {
+    children?: RedditListingChild[];
+  };
+}
+
 /** Maps the distance between `from` date and today to Reddit's supported top-feed window. */
 export function mapDateToTimeFilter(fromDate: Date): TimeFilter {
   const now = new Date();
@@ -26,19 +54,17 @@ async function fetchSubreddit(subreddit: string, limit: number, timeFilter: Time
 
   for (const url of urls) {
     try {
-      const response = await fetch(url, {
-        headers: { Accept: 'application/json' },
-      });
+      const response = await fetch(url, { headers: { Accept: 'application/json' } });
 
       if (!response.ok) {
         lastError = new Error(`HTTP ${response.status} ${response.statusText}`);
         continue;
       }
 
-      const data = await response.json();
+      const data = await response.json() as RedditListingResponse;
       const children = Array.isArray(data?.data?.children) ? data.data.children : [];
 
-      return children.map((child: any) => ({
+      return children.map((child) => ({
         id: child.data.id,
         subreddit: child.data.subreddit,
         title: child.data.title,
@@ -58,7 +84,7 @@ async function fetchSubreddit(subreddit: string, limit: number, timeFilter: Time
         link_flair_text: child.data.link_flair_text,
       }));
     } catch (error) {
-      lastError = error as Error;
+      lastError = error instanceof Error ? error : new Error('Failed to fetch subreddit data');
     }
   }
 
