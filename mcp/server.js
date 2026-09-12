@@ -1,8 +1,8 @@
 #!/usr/bin/env node
 
 const API_URL = (process.env.PAIN_PLATFORM_API_URL || 'http://127.0.0.1:4000').replace(/\/$/, '');
-const SUPPORTED_PROTOCOLS = new Set(['2026-07-28', '2025-06-18', '2024-11-05']);
-const LATEST_PROTOCOL = '2026-07-28';
+const SUPPORTED_PROTOCOLS = new Set(['2025-11-25', '2025-06-18', '2025-03-26', '2024-11-05']);
+const DEFAULT_PROTOCOL = '2025-11-25';
 
 function log(message) {
   process.stderr.write(`[pain-intelligence-mcp] ${message}\n`);
@@ -274,9 +274,17 @@ async function handleMessage(message) {
 
   if (method === 'notifications/initialized' || method === 'notifications/cancelled') return;
 
+  // Modern MCP clients probe stdio servers with server/discover and fall back to the
+  // legacy initialize handshake when the method is unsupported. This bridge intentionally
+  // serves the legacy stdio era for broad Codex / Claude compatibility.
+  if (method === 'server/discover') {
+    if (id !== undefined) respondError(id, -32601, 'Modern MCP discovery is not served by this stdio bridge; use legacy negotiation.');
+    return;
+  }
+
   if (method === 'initialize') {
     const requested = message?.params?.protocolVersion;
-    const protocolVersion = SUPPORTED_PROTOCOLS.has(requested) ? requested : LATEST_PROTOCOL;
+    const protocolVersion = SUPPORTED_PROTOCOLS.has(requested) ? requested : DEFAULT_PROTOCOL;
     respond(id, {
       protocolVersion,
       capabilities: { tools: { listChanged: false } },
@@ -336,4 +344,4 @@ process.stdin.on('end', () => process.exit(0));
 process.on('uncaughtException', (error) => log(`uncaughtException: ${error.stack || error.message}`));
 process.on('unhandledRejection', (error) => log(`unhandledRejection: ${String(error)}`));
 
-log(`MCP stdio server ready; platform API=${API_URL}`);
+log(`MCP stdio server ready; platform API=${API_URL}; protocol era=legacy stdio`);
