@@ -5,7 +5,31 @@ interface FetchCommentsResult {
   errors: string[];
 }
 
-function flattenCommentChildren(children: any[], post: RedditPost, depth = 0): RedditComment[] {
+interface RedditCommentNode {
+  kind?: string;
+  data?: {
+    id?: string;
+    subreddit?: string;
+    author?: string;
+    body?: string;
+    score?: number;
+    created_utc?: number;
+    permalink?: string;
+    replies?: string | {
+      data?: {
+        children?: RedditCommentNode[];
+      };
+    };
+  };
+}
+
+interface RedditThreadListing {
+  data?: {
+    children?: RedditCommentNode[];
+  };
+}
+
+function flattenCommentChildren(children: RedditCommentNode[], post: RedditPost, depth = 0): RedditComment[] {
   const comments: RedditComment[] = [];
 
   children.forEach((child) => {
@@ -27,7 +51,7 @@ function flattenCommentChildren(children: any[], post: RedditPost, depth = 0): R
       });
     }
 
-    const replies = data.replies?.data?.children;
+    const replies = typeof data.replies === 'object' ? data.replies?.data?.children : undefined;
     if (Array.isArray(replies) && depth < 4) {
       comments.push(...flattenCommentChildren(replies, post, depth + 1));
     }
@@ -54,7 +78,7 @@ export async function fetchThreadComments(post: RedditPost, limit = 40): Promise
         continue;
       }
 
-      const payload = await response.json();
+      const payload = await response.json() as RedditThreadListing[];
       const children = payload?.[1]?.data?.children;
       if (!Array.isArray(children)) return [];
 
