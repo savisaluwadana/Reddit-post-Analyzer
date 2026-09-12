@@ -49,6 +49,7 @@ function tokenJaccard(a = '', b = '') {
 export function normalizeMarketEntityKey(value = '') {
   const parts = normalizedText(value)
     .split(' ')
+    .map((part) => part.replace(/^[.-]+|[.-]+$/g, ''))
     .filter(Boolean)
     .filter((part, index, values) => !(LEGAL_SUFFIXES.has(part) && index >= values.length - 2));
   return parts.join(' ').replace(/\s+/g, ' ').trim();
