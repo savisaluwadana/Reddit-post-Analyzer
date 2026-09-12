@@ -1,6 +1,8 @@
 import { useEffect, useMemo, useState } from 'react';
 import type { ResearchJob } from '../types/researchJobs';
+import type { ResearchSearchQualityReport } from '../utils/researchSearchApi';
 import { createResearchJob, listResearchJobs, refreshResearchCoverage, requeueResearchJob } from '../utils/researchJobsApi';
+import { getResearchSearchQuality } from '../utils/researchSearchApi';
 
 function pct(value: number | null | undefined) {
   if (value == null || !Number.isFinite(value)) return '—';
@@ -13,6 +15,7 @@ export function ResearchJobsPanel() {
   const [audience, setAudience] = useState('');
   const [isLoading, setIsLoading] = useState(false);
   const [message, setMessage] = useState('');
+  const [qualityByJob, setQualityByJob] = useState<Record<string, ResearchSearchQualityReport>>({});
 
   const activeJobs = useMemo(() => jobs.filter((job) => !['complete', 'failed'].includes(job.status)).length, [jobs]);
   const completedJobs = useMemo(() => jobs.filter((job) => job.status === 'complete').length, [jobs]);
@@ -42,7 +45,7 @@ export function ResearchJobsPanel() {
       setJobs((previous) => [job, ...previous]);
       setTopic('');
       setAudience('');
-      setMessage('Research job queued. A connected Codex/Claude MCP host can claim it automatically.');
+      setMessage('Research job queued. A connected Codex/Claude MCP host can claim it and follow the deep-search plan.');
     } catch (error) {
       setMessage(error instanceof Error ? error.message : 'Failed to queue research job');
     } finally {
@@ -54,10 +57,27 @@ export function ResearchJobsPanel() {
     setIsLoading(true);
     setMessage('');
     try {
-      const updated = await refreshResearchCoverage(jobId);
+      const [updated, quality] = await Promise.all([
+        refreshResearchCoverage(jobId),
+        getResearchSearchQuality(jobId),
+      ]);
       setJobs((previous) => previous.map((job) => job._id === updated._id ? updated : job));
+      setQualityByJob((previous) => ({ ...previous, [jobId]: quality }));
     } catch (error) {
-      setMessage(error instanceof Error ? error.message : 'Failed to refresh coverage');
+      setMessage(error instanceof Error ? error.message : 'Failed to refresh research quality');
+    } finally {
+      setIsLoading(false);
+    }
+  };
+
+  const refreshSearchQuality = async (jobId: string) => {
+    setIsLoading(true);
+    setMessage('');
+    try {
+      const quality = await getResearchSearchQuality(jobId);
+      setQualityByJob((previous) => ({ ...previous, [jobId]: quality }));
+    } catch (error) {
+      setMessage(error instanceof Error ? error.message : 'Failed to evaluate search quality');
     } finally {
       setIsLoading(false);
     }
@@ -83,7 +103,7 @@ export function ResearchJobsPanel() {
         <div>
           <div className="eyebrow">Autonomous research queue</div>
           <h3>Start deep research from one question</h3>
-          <p>Queue the question here. A connected MCP host can claim it, collect cross-source evidence, fill coverage gaps, run semantic synthesis, validate competitors/pricing, and submit the final verdict.</p>
+          <p>Queue the question here. The MCP host now expands it into source-aware search missions, deep-scrapes evidence-rich threads, tracks search memory, hunts counter-evidence, measures evidence independence, fills gaps, runs semantic synthesis, and validates the market.</p>
         </div>
         <div className="research-job-stats">
           <span><b>{activeJobs}</b> active</span>
@@ -104,9 +124,9 @@ export function ResearchJobsPanel() {
       </div>
 
       <div className="research-job-agent-note">
-        <strong>MCP worker command</strong>
-        <code>claim_research_job</code>
-        <span>The connected host receives the full coverage → gap-fill → semantic → validation protocol. No model API key is stored by this app.</span>
+        <strong>MCP worker flow</strong>
+        <code>claim_research_job → get_research_search_plan</code>
+        <span>Search breadth, deep-thread traversal, contradiction hunting and evidence-quality checks now happen before semantic synthesis. No model API key is stored by this app.</span>
       </div>
 
       {message && <div className="cross-source-message">{message}</div>}
@@ -116,6 +136,7 @@ export function ResearchJobsPanel() {
         {jobs.slice(0, 12).map((job) => {
           const coverage = job.coverage;
           const metrics = coverage?.metrics;
+          const quality = qualityByJob[job._id];
           const verdicts = job.opportunityValidations.reduce<Record<string, number>>((acc, item) => {
             acc[item.verdict] = (acc[item.verdict] ?? 0) + 1;
             return acc;
@@ -128,9 +149,9 @@ export function ResearchJobsPanel() {
                   <h4>{job.name}</h4>
                   <p>{job.topic}</p>
                 </div>
-                <div className="research-job-score">
-                  <strong>{coverage?.collectionScore ?? 0}</strong>
-                  <span>coverage</span>
+                <div className="research-job-score-pair">
+                  <div className="research-job-score"><strong>{coverage?.collectionScore ?? 0}</strong><span>coverage</span></div>
+                  <div className={`research-job-score ${quality?.readyForSynthesis ? 'quality-ready' : ''}`}><strong>{quality?.qualityScore ?? '—'}</strong><span>search quality</span></div>
                 </div>
               </div>
 
@@ -143,6 +164,27 @@ export function ResearchJobsPanel() {
                 <span><b>{pct(metrics?.recentCoverage)}</b> recent</span>
               </div>
 
+              {quality && (
+                <div className="research-search-quality">
+                  <div className="research-search-quality-grid">
+                    <span><b>{quality.independence.independentEvidenceCount}</b> independent</span>
+                    <span><b>{pct(quality.independence.duplicationRate)}</b> near-duplicate</span>
+                    <span><b>{quality.signals.strongCommercial}</b> strong commercial</span>
+                    <span><b>{quality.signals.quantifiedImpact}</b> quantified impact</span>
+                    <span><b>{quality.signals.contradictionCandidates}</b> counter-evidence</span>
+                    <span><b>{quality.deepScraping.runs}</b> deep scrapes</span>
+                  </div>
+                  <div className={`research-quality-gate ${quality.readyForSynthesis ? 'ready' : 'not-ready'}`}>
+                    {quality.readyForSynthesis ? 'Evidence quality gate passed' : 'More search/deep-scrape work recommended before synthesis'}
+                  </div>
+                  {quality.gaps.length > 0 && (
+                    <div className="research-quality-gaps">
+                      {quality.gaps.slice(0, 4).map((gap) => <span key={gap.type} className={`gap-${gap.priority}`}>{gap.message}</span>)}
+                    </div>
+                  )}
+                </div>
+              )}
+
               {metrics?.dominantSourceName && (
                 <div className="research-job-concentration">
                   Largest source: <strong>{metrics.dominantSourceName}</strong> · {pct(metrics.dominantSourceShare)} of collected evidence
@@ -151,7 +193,7 @@ export function ResearchJobsPanel() {
 
               {job.gaps.length > 0 && job.status !== 'complete' && (
                 <div className="research-job-gaps">
-                  <strong>Research gaps</strong>
+                  <strong>Coverage gaps</strong>
                   {job.gaps.slice(0, 4).map((gap) => <span key={gap.gap} className={`gap-${gap.priority}`}>{gap.goal}</span>)}
                 </div>
               )}
@@ -173,7 +215,8 @@ export function ResearchJobsPanel() {
                 <span>{job.claimedBy ? `worker: ${job.claimedBy}` : 'waiting for MCP worker'}</span>
                 <span>{job.hostRunId ? 'semantic run linked' : 'semantic run pending'}</span>
                 <div>
-                  <button className="btn-secondary" disabled={isLoading} onClick={() => void refreshCoverage(job._id)}>Refresh coverage</button>
+                  <button className="btn-secondary" disabled={isLoading} onClick={() => void refreshSearchQuality(job._id)}>Search quality</button>
+                  <button className="btn-secondary" disabled={isLoading} onClick={() => void refreshCoverage(job._id)}>Refresh all</button>
                   {(job.status === 'failed' || job.status === 'claimed') && <button className="btn-secondary" disabled={isLoading} onClick={() => void requeue(job._id)}>Requeue</button>}
                 </div>
               </div>
