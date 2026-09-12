@@ -8,6 +8,12 @@ interface PostListProps {
 }
 
 const formatNumber = (value: number) => new Intl.NumberFormat('en', { notation: value >= 10000 ? 'compact' : 'standard', maximumFractionDigits: 1 }).format(value);
+const postDateFormatter = new Intl.DateTimeFormat('en', { month: 'short', day: 'numeric', year: 'numeric' });
+
+function formatPostDate(timestamp: number) {
+  const date = new Date(timestamp * 1000);
+  return Number.isNaN(date.getTime()) ? 'Unknown date' : postDateFormatter.format(date);
+}
 
 export const PostList: React.FC<PostListProps> = ({ posts, errors }) => {
   const [selectedPost, setSelectedPost] = useState<{ post: RedditPost; rank: number } | null>(null);
@@ -40,13 +46,6 @@ export const PostList: React.FC<PostListProps> = ({ posts, errors }) => {
     ].filter(Boolean).join('\n');
   };
 
-  const relativeTime = (timestamp: number) => {
-    const diff = Math.max(0, Date.now() / 1000 - timestamp);
-    if (diff < 3600) return `${Math.max(1, Math.floor(diff / 60))}m ago`;
-    if (diff < 86400) return `${Math.floor(diff / 3600)}h ago`;
-    return `${Math.floor(diff / 86400)}d ago`;
-  };
-
   return (
     <section className="post-section">
       {errors.length > 0 && (
@@ -77,7 +76,7 @@ export const PostList: React.FC<PostListProps> = ({ posts, errors }) => {
                   <span className="content-badge" style={{ color: badge.color, borderColor: badge.color }}>{badge.text}</span>
                   <span className="subreddit-name">r/{post.subreddit}</span>
                   {post.link_flair_text && <span className="flair-chip">{post.link_flair_text}</span>}
-                  <span className="muted-copy">u/{post.author} · {relativeTime(post.created_utc)}</span>
+                  <span className="muted-copy">u/{post.author} · {formatPostDate(post.created_utc)}</span>
                 </div>
                 <div className="opportunity-badge" title="Heuristic opportunity score from engagement, recency and conversation signals">
                   <span>Opportunity</span>
@@ -120,7 +119,7 @@ export const PostList: React.FC<PostListProps> = ({ posts, errors }) => {
             <div className="card modal-card" onClick={(event) => event.stopPropagation()}>
               <div className="modal-header">
                 <div>
-                  <div className="eyebrow">Post #{selectedPost.rank} · r/{selectedPost.post.subreddit}</div>
+                  <div className="eyebrow">Post #{selectedPost.rank} · r/{selectedPost.post.subreddit} · {formatPostDate(selectedPost.post.created_utc)}</div>
                   <h2>{selectedPost.post.title}</h2>
                 </div>
                 <button className="btn-secondary compact-button" onClick={() => setSelectedPost(null)}>Close</button>
