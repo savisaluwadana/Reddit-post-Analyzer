@@ -34,6 +34,8 @@ jobs:
           node --check server/painScanRoutes.js
           node --check server/evidenceRoutes.js
           node --check server/generalPainEngine.js
+          node --check server/hostIntelligenceRoutes.js
+          node --check mcp/hostTools.js
           node --check mcp/server.js
 
       - name: MCP stdio smoke test
@@ -45,6 +47,13 @@ jobs:
           echo "$OUTPUT" | grep '"protocolVersion":"2025-11-25"'
           echo "$OUTPUT" | grep '"name":"ingest_evidence"'
           echo "$OUTPUT" | grep '"name":"analyze_pain_points"'
+          echo "$OUTPUT" | grep '"name":"start_llm_research_run"'
+          echo "$OUTPUT" | grep '"name":"get_llm_evidence_batch"'
+          echo "$OUTPUT" | grep '"name":"submit_llm_annotations"'
+          echo "$OUTPUT" | grep '"name":"get_llm_synthesis_pack"'
+          echo "$OUTPUT" | grep '"name":"submit_llm_synthesis"'
+          echo "$OUTPUT" | grep '"name":"get_research_graph"'
+          echo "$OUTPUT" | grep 'No model API key is required'
 
       - name: Build
         run: npm run build

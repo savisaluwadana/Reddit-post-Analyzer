@@ -3,6 +3,7 @@ import dotenv from 'dotenv';
 import express from 'express';
 import mongoose from 'mongoose';
 import { createEvidenceRouter } from './evidenceRoutes.js';
+import { createHostIntelligenceRouter } from './hostIntelligenceRoutes.js';
 import { createPainScanRouter } from './painScanRoutes.js';
 
 dotenv.config();
@@ -22,6 +23,7 @@ app.use(cors({ origin: allowedOrigin }));
 app.use(express.json({ limit: '2mb' }));
 app.use('/api/pain-scans', createPainScanRouter());
 app.use('/api/evidence', createEvidenceRouter());
+app.use('/api/host-intelligence', createHostIntelligenceRouter());
 
 const redditPostSchema = new mongoose.Schema(
   {
@@ -107,7 +109,9 @@ app.get('/api/health', (_req, res) => {
     ok: true,
     database: mongoose.connection.readyState === 1 ? 'connected' : 'disconnected',
     snapshotRetentionDays,
-    capabilities: ['reddit-collector', 'cross-source-evidence', 'pain-intelligence', 'mcp-bridge'],
+    capabilities: ['reddit-collector', 'cross-source-evidence', 'pain-intelligence', 'mcp-bridge', 'host-llm-intelligence'],
+    llmMode: 'mcp-host',
+    llmApiKeyRequired: false,
   });
 });
 
