@@ -17,6 +17,11 @@ function serializeJob(job) {
   return { ...raw, _id: String(raw._id), hostRunId: raw.hostRunId ? String(raw.hostRunId) : '' };
 }
 
+async function collectionClosedJobById(id) {
+  if (!mongoose.isValidObjectId(id)) return null;
+  return model('ResearchJob').findOne({ _id: id, status: { $in: [...COLLECTION_CLOSED_STATUSES] } }).select({ _id: 1, name: 1, status: 1, batchId: 1 }).lean();
+}
+
 export function createIntegrityGuardRouter() {
   const router = express.Router();
 
@@ -25,6 +30,87 @@ export function createIntegrityGuardRouter() {
   router.use('/quality-intelligence', createQualityIntelligenceRouter());
   router.use('/opportunity-os', createOpportunityOsRouter());
   router.use('/scrape-intelligence', createScrapeIntelligenceRouter());
+
+  // Evidence becomes part of the semantic run's immutable input set once semantic work
+  // begins. Reject late writes to a closed job batch instead of silently changing what
+  // remains to annotate/synthesize.
+  router.post('/evidence/bulk', async (req, res, next) => {
+    try {
+      const batchIds = new Set();
+      const fallback = String(req.body?.batchId ?? req.body?.batch_id ?? '').trim();
+      if (fallback) batchIds.add(fallback);
+      if (Array.isArray(req.body?.items)) {
+        req.body.items.forEach((item) => {
+          const batchId = String(item?.batchId ?? item?.batch_id ?? fallback ?? '').trim();
+          if (batchId) batchIds.add(batchId);
+        });
+      }
+      if (!batchIds.size) return next();
+      const closed = await model('ResearchJob').findOne({
+        batchId: { $in: [...batchIds] },
+        status: { $in: [...COLLECTION_CLOSED_STATUSES] },
+      }).select({ _id: 1, name: 1, status: 1, batchId: 1 }).lean();
+      if (!closed) return next();
+      return res.status(409).json({
+        message: 'Evidence collection is closed for this research job because semantic processing has already started.',
+        jobId: String(closed._id),
+        jobName: closed.name,
+        jobStatus: closed.status,
+        batchId: closed.batchId,
+      });
+    } catch (error) {
+      console.error('Failed to guard late evidence ingestion:', error);
+      return res.status(500).json({ message: 'Failed to validate evidence collection state' });
+    }
+  });
+
+  // Reject duplicate/empty opportunity identifiers before the host synthesis route can
+  // persist an ambiguous result that cannot later satisfy one-validation-per-opportunity.
+  router.post('/host-intelligence/runs/:id/synthesis', (req, res, next) => {
+    const opportunities = Array.isArray(req.body?.opportunities) ? req.body.opportunities : [];
+    const ids = opportunities.map((item) => String(item?.opportunityId ?? item?.opportunity_id ?? item?.id ?? '').trim().toLowerCase());
+    if (ids.some((id) => !id)) return res.status(400).json({ message: 'Every synthesized opportunity must have a non-empty opportunity id.' });
+    const unique = new Set(ids);
+    if (unique.size !== ids.length) {
+      const seen = new Set();
+      const duplicates = [...new Set(ids.filter((id) => seen.has(id) || !seen.add(id)))];
+      return res.status(400).json({ message: 'Synthesized opportunities must have unique opportunity ids.', duplicateOpportunityIds: duplicates.slice(0, 20) });
+    }
+    return next();
+  });
+
+  // Search/deep-scrape audit memory is part of the evidence collection phase. Keeping it
+  // immutable after semantic handoff prevents late browsing activity from rewriting the
+  // quality/audit trail underneath an in-progress or completed semantic run.
+  router.post('/research-search/jobs/:id/progress', async (req, res, next) => {
+    try {
+      const closed = await collectionClosedJobById(req.params.id);
+      if (!closed) return next();
+      return res.status(409).json({
+        message: `Search progress is read-only while the research job is ${closed.status}.`,
+        jobId: String(closed._id),
+        jobStatus: closed.status,
+      });
+    } catch (error) {
+      console.error('Failed to guard late search progress:', error);
+      return res.status(500).json({ message: 'Failed to validate research collection state' });
+    }
+  });
+
+  router.post('/research-search/jobs/:id/deep-scrape', async (req, res, next) => {
+    try {
+      const closed = await collectionClosedJobById(req.params.id);
+      if (!closed) return next();
+      return res.status(409).json({
+        message: `Deep-scrape history is read-only while the research job is ${closed.status}.`,
+        jobId: String(closed._id),
+        jobStatus: closed.status,
+      });
+    } catch (error) {
+      console.error('Failed to guard late deep-scrape progress:', error);
+      return res.status(500).json({ message: 'Failed to validate research collection state' });
+    }
+  });
 
   // Coverage is a collection-phase operation. Once semantic work starts, refreshing
   // coverage must never rewind the persisted lifecycle back to gap-research.

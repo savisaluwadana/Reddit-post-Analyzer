@@ -20,6 +20,11 @@ test('preserves meaningful query parameters while sorting them', () => {
   assert.equal(value, 'https://example.com/thread?page=2&sort=old');
 });
 
+test('does not strip generic source or s parameters that may be semantic', () => {
+  const value = canonicalizeResearchUrl('https://example.com/search?utm_source=newsletter&source=issues&s=kubernetes');
+  assert.equal(value, 'https://example.com/search?s=kubernetes&source=issues');
+});
+
 test('never recommends bypassing robots, auth or paywalls', () => {
   assert.deepEqual(classifyAccessBoundary({ robotsAllowed: false }), { action: 'skip', reason: 'robots-disallowed', retryable: false });
   assert.deepEqual(classifyAccessBoundary({ requiresLogin: true }), { action: 'skip', reason: 'authentication-required', retryable: false });
@@ -57,6 +62,25 @@ test('frontier canonicalization deduplicates tracking variants and respects host
   assert.equal(new Set(result.selected.map((item) => item.host)).size, 2);
 });
 
+test('frontier host cap accounts for pages already visited earlier in the session', () => {
+  const result = rankScrapeFrontier([
+    { url: 'https://example.com/new', relevanceScore: 95, firstHandLikelihood: 90, evidenceYieldLikelihood: 90 },
+    { url: 'https://other.example.org/new', relevanceScore: 80, firstHandLikelihood: 80, evidenceYieldLikelihood: 80 },
+  ], { maxPerHost: 2, hostVisitCounts: { 'example.com': 2 }, limit: 10 });
+  assert.equal(result.selected.some((item) => item.host === 'example.com'), false);
+  assert.equal(result.selected.some((item) => item.host === 'other.example.org'), true);
+});
+
+test('frontier root cap accounts for pages already visited under that root', () => {
+  const root = 'https://forum.example.com/thread/1';
+  const result = rankScrapeFrontier([
+    { url: 'https://forum.example.com/thread/1?page=9', rootUrl: root, sourceKind: 'forum', relevanceScore: 95, firstHandLikelihood: 90, evidenceYieldLikelihood: 90 },
+    { url: 'https://forum.example.com/thread/2', rootUrl: 'https://forum.example.com/thread/2', sourceKind: 'forum', relevanceScore: 80, firstHandLikelihood: 80, evidenceYieldLikelihood: 80 },
+  ], { rootVisitCounts: { [root]: 12 }, maxPerHost: 50, limit: 10 });
+  assert.equal(result.selected.some((item) => item.url.includes('thread/1')), false);
+  assert.equal(result.selected.some((item) => item.url.includes('thread/2')), true);
+});
+
 test('rich extraction provenance and context produces strong quality', () => {
   const quality = evaluateExtractionQuality({
     url: 'https://forum.example.com/thread/1', rootUrl: 'https://forum.example.com/thread/1',
@@ -85,11 +109,37 @@ test('crawl stops after sustained low marginal evidence yield', () => {
   assert.equal(decision.reason, 'marginal-yield-collapsed');
 });
 
+test('explicit zero marginal-yield threshold is preserved', () => {
+  const decision = shouldStopScrapeSession({
+    pagesVisited: 20, evidenceAdded: 8, frontierCount: 20, duplicateRate: 0, blockedShare: 0,
+    recentEvidenceYields: [0, 0, 0, 0, 0, 0],
+  }, { maxPages: 100, evidenceTarget: 60, minMarginalYield: 0 });
+  assert.equal(decision.stop, false);
+});
+
+test('retry-later frontier does not look exhausted', () => {
+  const decision = shouldStopScrapeSession({
+    pagesVisited: 5, evidenceAdded: 3, frontierCount: 0, retryLaterCount: 4, duplicateRate: 0, blockedShare: 0,
+    recentEvidenceYields: [1, 1, 1],
+  }, { maxPages: 100, evidenceTarget: 60 });
+  assert.equal(decision.stop, false);
+  assert.equal(decision.reason, 'waiting-for-retry');
+});
+
 test('crawl stops on duplicate saturation', () => {
   const decision = shouldStopScrapeSession({
     pagesVisited: 15, evidenceAdded: 20, frontierCount: 20, duplicateRate: 0.7, blockedShare: 0.1,
     recentEvidenceYields: [1, 1, 1, 1, 1],
   }, { maxDuplicateRate: 0.45, evidenceTarget: 60 });
+  assert.equal(decision.stop, true);
+  assert.equal(decision.reason, 'duplicate-saturation');
+});
+
+test('explicit zero duplicate threshold is preserved', () => {
+  const decision = shouldStopScrapeSession({
+    pagesVisited: 10, evidenceAdded: 10, frontierCount: 10, duplicateRate: 0.01, blockedShare: 0,
+    recentEvidenceYields: [1, 1, 1, 1, 1],
+  }, { maxDuplicateRate: 0, evidenceTarget: 60 });
   assert.equal(decision.stop, true);
   assert.equal(decision.reason, 'duplicate-saturation');
 });

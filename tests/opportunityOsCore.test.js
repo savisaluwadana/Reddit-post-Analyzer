@@ -4,7 +4,9 @@ import {
   buildExperimentTemplate,
   calculateExperimentSignal,
   calculateOpportunityDecision,
+  calculateOpportunityWorkspaceDecision,
   calculateValidationSummary,
+  canEnterOpportunityStage,
   normalizeExperimentType,
 } from '../server/opportunityOsCore.js';
 
@@ -28,6 +30,18 @@ test('a supports label with no observed data is capped', () => {
   const signal = calculateExperimentSignal({ type: 'interview', status: 'complete', verdict: 'supports', result: {} });
   assert.ok(signal.score <= 45);
   assert.equal(signal.paidSignal, false);
+});
+
+test('failed experiments are not counted as market validation', () => {
+  const signal = calculateExperimentSignal({
+    type: 'paid-pilot', status: 'failed', verdict: 'supports',
+    result: { sampleSize: 10, responses: 10, positiveResponses: 10, paidCommitments: 2, revenue: 1000 },
+  });
+  assert.equal(signal.counted, false);
+  assert.equal(signal.paidSignal, false);
+  const summary = calculateValidationSummary([{ experimentId: 'failed', type: 'paid-pilot', status: 'failed', verdict: 'supports', result: { paidCommitments: 2, revenue: 1000 } }]);
+  assert.equal(summary.completedExperiments, 0);
+  assert.equal(summary.paidSignals, 0);
 });
 
 test('actual money or paid commitments create a commercial signal', () => {
@@ -62,6 +76,17 @@ test('prior reject verdict stays stopped until fresh real-world validation exist
   assert.ok(decision.decisionScore <= 45);
 });
 
+test('workspace decision helper preserves prior market-validation verdict', () => {
+  const decision = calculateOpportunityWorkspaceDecision({
+    researchScore: 95,
+    marketValidationVerdict: 'reject',
+    founderFit: { skillFit: 95, distributionFit: 95, capitalFit: 95, timeToMarketFit: 95, operatingFit: 95 },
+    experiments: [],
+  });
+  assert.equal(decision.priorMarketValidationVerdict, 'reject');
+  assert.equal(decision.recommendation, 'stop');
+});
+
 test('two strong experiments without paid proof still do not produce build', () => {
   const experiments = [
     {
@@ -93,6 +118,20 @@ test('strong validation plus real paid proof can unlock build', () => {
   assert.equal(decision.recommendation, 'build');
   assert.ok(decision.decisionScore >= 78);
   assert.equal(decision.validation.paidSignals, 1);
+  assert.equal(canEnterOpportunityStage('specification', decision).allowed, true);
+  assert.equal(canEnterOpportunityStage('building', decision).allowed, true);
+});
+
+test('build and specification stages are locked until the decision is build', () => {
+  const decision = calculateOpportunityDecision({ researchScore: 90, founderFit: { skillFit: 90 }, experiments: [] });
+  assert.equal(decision.recommendation, 'validate');
+  assert.deepEqual(canEnterOpportunityStage('building', decision), { allowed: false, reason: 'build-gate-not-passed' });
+  assert.deepEqual(canEnterOpportunityStage('specification', decision), { allowed: false, reason: 'build-gate-not-passed' });
+});
+
+test('gtm stage requires at least one usable completed experiment', () => {
+  const decision = calculateOpportunityDecision({ researchScore: 90, founderFit: { skillFit: 90 }, experiments: [] });
+  assert.deepEqual(canEnterOpportunityStage('gtm', decision), { allowed: false, reason: 'real-world-validation-required' });
 });
 
 test('repeated refutation caps validation enthusiasm', () => {

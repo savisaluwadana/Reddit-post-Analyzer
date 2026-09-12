@@ -16,7 +16,10 @@ export function normalizeExperimentType(value) {
 
 export function calculateExperimentSignal(experiment = {}) {
   const status = String(experiment.status || '').toLowerCase();
-  if (status !== 'complete' && status !== 'failed') {
+  // A failed experiment means the validation procedure itself did not produce a usable
+  // market observation. Do not let a stale/supportive verdict on a failed run move the
+  // opportunity score.
+  if (status !== 'complete') {
     return { score: 0, counted: false, paidSignal: false, confidence: 0 };
   }
 
@@ -181,6 +184,30 @@ export function calculateOpportunityDecision({ researchScore = 0, experiments = 
     founderFit: fit,
     rule: 'Build requires a high combined score, at least two completed experiments, and at least one actual paid/commercial signal.',
   };
+}
+
+export function calculateOpportunityWorkspaceDecision(workspace = {}) {
+  return calculateOpportunityDecision({
+    researchScore: workspace.researchScore,
+    experiments: workspace.experiments || [],
+    founderFit: workspace.founderFit || {},
+    marketValidationVerdict: workspace.marketValidationVerdict || '',
+  });
+}
+
+export function canEnterOpportunityStage(stage, decision = {}) {
+  const normalized = String(stage || '').toLowerCase();
+  if (!WORKSPACE_STAGES.has(normalized)) return { allowed: false, reason: 'invalid-stage' };
+  if (['specification','building'].includes(normalized) && decision.recommendation !== 'build') {
+    return { allowed: false, reason: 'build-gate-not-passed' };
+  }
+  if (normalized === 'gtm' && (decision.validation?.completedExperiments || 0) < 1) {
+    return { allowed: false, reason: 'real-world-validation-required' };
+  }
+  if (normalized === 'gtm' && decision.recommendation === 'stop') {
+    return { allowed: false, reason: 'stopped-opportunity' };
+  }
+  return { allowed: true, reason: 'allowed' };
 }
 
 export function buildExperimentTemplate(type = 'interview', opportunity = {}) {

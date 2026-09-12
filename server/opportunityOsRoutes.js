@@ -7,7 +7,8 @@ import {
   EXPERIMENT_VERDICTS,
   WORKSPACE_STAGES,
   buildExperimentTemplate,
-  calculateOpportunityDecision,
+  calculateOpportunityWorkspaceDecision,
+  canEnterOpportunityStage,
   normalizeExperimentType,
 } from './opportunityOsCore.js';
 
@@ -237,7 +238,7 @@ function normalizeExperiment(input = {}, opportunity = {}) {
 
 function serializeWorkspace(workspace) {
   const raw = workspace?.toObject ? workspace.toObject() : workspace;
-  const decision = calculateOpportunityDecision({ researchScore: raw.researchScore, experiments: raw.experiments || [], founderFit: raw.founderFit || {} });
+  const decision = calculateOpportunityWorkspaceDecision(raw);
   return {
     ...raw,
     _id: String(raw._id),
@@ -247,7 +248,7 @@ function serializeWorkspace(workspace) {
 }
 
 async function refreshDecision(workspace, reason = 'workspace update') {
-  const decision = calculateOpportunityDecision({ researchScore: workspace.researchScore, experiments: workspace.experiments || [], founderFit: workspace.founderFit || {} });
+  const decision = calculateOpportunityWorkspaceDecision(workspace);
   const previous = workspace.decision || {};
   workspace.decision = decision;
   if (previous.decisionScore !== decision.decisionScore || previous.recommendation !== decision.recommendation) {
@@ -444,10 +445,11 @@ export function createOpportunityOsRouter() {
       const result = req.body?.result || {};
       experiment.status = status;
       experiment.verdict = verdict;
+      const responses = Math.max(0, Number(result.responses) || 0);
       experiment.result = {
         sampleSize: Math.max(0, Number(result.sampleSize ?? result.sample_size) || 0),
-        responses: Math.max(0, Number(result.responses) || 0),
-        positiveResponses: Math.max(0, Number(result.positiveResponses ?? result.positive_responses) || 0),
+        responses,
+        positiveResponses: Math.min(responses || Number.MAX_SAFE_INTEGER, Math.max(0, Number(result.positiveResponses ?? result.positive_responses) || 0)),
         interviews: Math.max(0, Number(result.interviews) || 0),
         signups: Math.max(0, Number(result.signups) || 0),
         paidCommitments: Math.max(0, Number(result.paidCommitments ?? result.paid_commitments) || 0),
@@ -459,7 +461,7 @@ export function createOpportunityOsRouter() {
       experiment.evidenceUrls = safeList(req.body?.evidenceUrls ?? req.body?.evidence_urls, 30, 1200);
       experiment.learning = safeText(req.body?.learning, 1800);
       experiment.nextStep = safeText(req.body?.nextStep ?? req.body?.next_step, 1000);
-      if (['complete','failed'].includes(status)) experiment.completedAt = new Date();
+      experiment.completedAt = ['complete','failed'].includes(status) ? new Date() : null;
       const decision = await refreshDecision(workspace, `recorded result for ${experiment.type} experiment`);
       if (decision.recommendation === 'build' && workspace.stage === 'validation') workspace.stage = 'specification';
       if (decision.recommendation === 'stop') workspace.stage = 'stopped';
@@ -502,7 +504,9 @@ export function createOpportunityOsRouter() {
     try {
       const workspace = await OpportunityWorkspaceModel.findById(req.params.id);
       if (!workspace) return res.status(404).json({ message: 'Opportunity workspace not found' });
-      const decision = calculateOpportunityDecision({ researchScore: workspace.researchScore, experiments: workspace.experiments || [], founderFit: workspace.founderFit || {} });
+      const decision = calculateOpportunityWorkspaceDecision(workspace);
+      const gate = canEnterOpportunityStage('specification', decision);
+      if (!gate.allowed) return res.status(409).json({ message: 'Build specification is locked until the opportunity passes the build gate', reason: gate.reason, decision });
       workspace.buildSpec = normalizeBuildSpec(req.body || {}, decision);
       workspace.stage = 'specification';
       await refreshDecision(workspace, 'MVP/build specification updated');
@@ -518,6 +522,9 @@ export function createOpportunityOsRouter() {
     try {
       const workspace = await OpportunityWorkspaceModel.findById(req.params.id);
       if (!workspace) return res.status(404).json({ message: 'Opportunity workspace not found' });
+      const decision = calculateOpportunityWorkspaceDecision(workspace);
+      const gate = canEnterOpportunityStage('gtm', decision);
+      if (!gate.allowed) return res.status(409).json({ message: 'GTM planning requires at least one usable real-world validation result and a non-stopped opportunity', reason: gate.reason, decision });
       workspace.gtmPlan = normalizeGtm(req.body || {});
       workspace.stage = 'gtm';
       await refreshDecision(workspace, 'first-customer GTM plan updated');
@@ -535,6 +542,9 @@ export function createOpportunityOsRouter() {
       if (!WORKSPACE_STAGES.has(stage)) return res.status(400).json({ message: 'Invalid workspace stage' });
       const workspace = await OpportunityWorkspaceModel.findById(req.params.id);
       if (!workspace) return res.status(404).json({ message: 'Opportunity workspace not found' });
+      const decision = calculateOpportunityWorkspaceDecision(workspace);
+      const gate = canEnterOpportunityStage(stage, decision);
+      if (!gate.allowed) return res.status(409).json({ message: `Cannot move opportunity to ${stage} before its decision gate is satisfied`, reason: gate.reason, decision });
       workspace.stage = stage;
       await refreshDecision(workspace, `workspace stage changed to ${stage}`);
       await workspace.save();
