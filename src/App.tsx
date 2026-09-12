@@ -2,6 +2,7 @@ import { useEffect, useMemo, useState } from 'react';
 import { Controls } from './components/Controls';
 import { CrossSourceIntelligencePanel } from './components/CrossSourceIntelligencePanel';
 import { CsvVisualizer } from './components/CsvVisualizer';
+import { HostIntelligencePanel } from './components/HostIntelligencePanel';
 import { IntelligencePanel } from './components/IntelligencePanel';
 import { PainPointLab } from './components/PainPointLab';
 import { PostList } from './components/PostList';
@@ -213,13 +214,14 @@ function App() {
         <div className="hero-kicker">Cross-source pain intelligence</div>
         <h1 className="header-title">Pain Intelligence Lab</h1>
         <p className="header-desc">
-          Turn public conversations, reviews, forums, issues, support threads and community discussions into evidence-backed pain points, unmet needs and product opportunities.
+          Turn public conversations, reviews, forums, issues, support threads and community discussions into evidence-backed pain points, jobs-to-be-done, competitor intelligence and product opportunities.
         </p>
-        <div className="hero-note">MCP-ready • Multi-source evidence • Transparent scoring • Historical movement • Reddit built in as one connector</div>
+        <div className="hero-note">MCP-hosted LLM reasoning • No model API key • Multi-source evidence • Semantic clustering • JTBD + entities • Historical movement</div>
       </header>
 
       <main>
         <CrossSourceIntelligencePanel />
+        <HostIntelligencePanel />
 
         <div className="source-connector-divider">
           <span>Built-in source connector</span>
