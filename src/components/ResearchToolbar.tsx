@@ -9,6 +9,8 @@ interface ResearchToolbarProps {
   setSignalFilter: (value: SignalFilter) => void;
   minScore: number;
   setMinScore: (value: number) => void;
+  minComments: number;
+  setMinComments: (value: number) => void;
   resultCount: number;
 }
 
@@ -21,6 +23,8 @@ export function ResearchToolbar({
   setSignalFilter,
   minScore,
   setMinScore,
+  minComments,
+  setMinComments,
   resultCount,
 }: ResearchToolbarProps) {
   return (
@@ -33,7 +37,7 @@ export function ResearchToolbar({
         <div className="result-count">{resultCount} matches</div>
       </div>
 
-      <div className="toolbar-grid">
+      <div className="toolbar-grid toolbar-grid-five">
         <label className="field-group field-wide">
           <span>Search title, text, subreddit or author</span>
           <input
@@ -75,6 +79,17 @@ export function ResearchToolbar({
             min={0}
             value={minScore}
             onChange={(event) => setMinScore(Math.max(0, Number(event.target.value) || 0))}
+          />
+        </label>
+
+        <label className="field-group">
+          <span>Minimum comments</span>
+          <input
+            className="input-base"
+            type="number"
+            min={0}
+            value={minComments}
+            onChange={(event) => setMinComments(Math.max(0, Number(event.target.value) || 0))}
           />
         </label>
       </div>
