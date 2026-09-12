@@ -1,5 +1,6 @@
 const TRACKING_PARAMS = new Set([
-  'utm_source','utm_medium','utm_campaign','utm_term','utm_content','utm_id','gclid','fbclid','msclkid','mc_cid','mc_eid','ref_src','ref_url','source','campaign','tracking','trk','s','si'
+  'utm_source','utm_medium','utm_campaign','utm_term','utm_content','utm_id',
+  'gclid','fbclid','msclkid','mc_cid','mc_eid','ref_src','ref_url',
 ]);
 
 const SOURCE_POLICIES = {
@@ -48,9 +49,16 @@ const SOURCE_POLICIES = {
 const clamp = (value, min = 0, max = 100) => Math.min(Math.max(Number(value) || 0, min), max);
 const round = (value, digits = 1) => Number(Number(value || 0).toFixed(digits));
 const safeText = (value, maxLength = 2000) => String(value || '').replace(/\s+/g, ' ').trim().slice(0, maxLength);
+const finiteOr = (value, fallback) => Number.isFinite(Number(value)) ? Number(value) : fallback;
 
 function hostname(value = '') {
   try { return new URL(value).hostname.toLowerCase().replace(/^www\./, ''); } catch { return ''; }
+}
+
+function countFrom(input, key) {
+  if (input instanceof Map) return Number(input.get(key)) || 0;
+  if (input && typeof input === 'object') return Number(input[key]) || 0;
+  return 0;
 }
 
 export function canonicalizeResearchUrl(value = '') {
@@ -78,7 +86,6 @@ export function canonicalizeResearchUrl(value = '') {
     url.pathname = url.pathname.replace(/\/{2,}/g, '/');
     if (url.pathname.length > 1) url.pathname = url.pathname.replace(/\/$/, '');
 
-    // Normalize common Reddit host variants without rewriting the path semantics.
     if (['old.reddit.com','new.reddit.com','np.reddit.com'].includes(url.hostname)) url.hostname = 'reddit.com';
     return url.toString();
   } catch {
@@ -101,7 +108,7 @@ export function classifyAccessBoundary(input = {}) {
   const challenge = Boolean(input.challenge ?? input.botChallenge ?? input.bot_challenge);
 
   if (robotsAllowed === false) return { action: 'skip', reason: 'robots-disallowed', retryable: false };
-  if (requiresLogin || statusCode === 401 || statusCode === 403 && Boolean(input.loginWall ?? input.login_wall)) {
+  if (requiresLogin || statusCode === 401 || (statusCode === 403 && Boolean(input.loginWall ?? input.login_wall))) {
     return { action: 'skip', reason: 'authentication-required', retryable: false };
   }
   if (paywalled) return { action: 'skip', reason: 'paywall', retryable: false };
@@ -146,7 +153,7 @@ export function scoreScrapeCandidate(candidate = {}, context = {}) {
 
   const queryContext = [context.topic, context.audience, context.objective, context.query].filter(Boolean).join(' ');
   const candidateText = [candidate.title, candidate.anchorText ?? candidate.anchor_text, candidate.snippet, candidate.context].filter(Boolean).join(' ');
-  const relevance = clamp((Number(candidate.relevanceScore ?? candidate.relevance_score) || tokenOverlap(queryContext, candidateText) * 100));
+  const relevance = clamp(Number(candidate.relevanceScore ?? candidate.relevance_score) || tokenOverlap(queryContext, candidateText) * 100);
   const firstHand = clamp(candidate.firstHandLikelihood ?? candidate.first_hand_likelihood ?? (['reddit','forum','review','support','community','github','social','app-store','marketplace'].includes(sourceKind) ? 62 : 35));
   const evidenceYield = clamp(candidate.evidenceYieldLikelihood ?? candidate.evidence_yield_likelihood ?? 50);
   const novelty = clamp(candidate.noveltyScore ?? candidate.novelty_score ?? 70);
@@ -191,7 +198,11 @@ export function scoreScrapeCandidate(candidate = {}, context = {}) {
     action: access.action === 'retry-later' ? 'retry-later' : score >= 42 ? 'visit' : score >= 28 ? 'defer' : 'skip',
     reasons,
     access,
-    components: { relevance: round(relevance), firstHand: round(firstHand), evidenceYield: round(evidenceYield), novelty: round(novelty), recency: round(recency), commercial: round(commercial), contradiction: round(contradiction), sourceTrust: round(sourceTrust), duplicateRisk: round(duplicateRisk), accessCost: round(accessCost) },
+    components: {
+      relevance: round(relevance), firstHand: round(firstHand), evidenceYield: round(evidenceYield), novelty: round(novelty),
+      recency: round(recency), commercial: round(commercial), contradiction: round(contradiction), sourceTrust: round(sourceTrust),
+      duplicateRisk: round(duplicateRisk), accessCost: round(accessCost),
+    },
   };
 }
 
@@ -217,7 +228,10 @@ export function rankScrapeFrontier(candidates = [], context = {}) {
     const host = item.host || hostname(item.url) || 'unknown';
     const root = canonicalizeResearchUrl(item.rootUrl ?? item.root_url ?? item.url) || item.url;
     const policy = sourcePolicy(item.sourceKind);
-    if ((hostCounts.get(host) || 0) >= maxPerHost) continue;
+    const globalHostCount = countFrom(context.hostVisitCounts ?? context.host_visit_counts, host);
+    const globalRootCount = countFrom(context.rootVisitCounts ?? context.root_visit_counts, root);
+    if (globalHostCount + (hostCounts.get(host) || 0) >= maxPerHost) continue;
+    if (globalRootCount + (rootCounts.get(root) || 0) >= policy.maxPagesPerRoot) continue;
     if ((rootCounts.get(root) || 0) >= policy.maxCandidatesPerRoot) continue;
     hostCounts.set(host, (hostCounts.get(host) || 0) + 1);
     rootCounts.set(root, (rootCounts.get(root) || 0) + 1);
@@ -273,22 +287,26 @@ export function evaluateExtractionQuality(extraction = {}) {
 
 export function shouldStopScrapeSession(stats = {}, policyInput = {}) {
   const policy = {
-    maxPages: Math.min(Math.max(Number(policyInput.maxPages ?? policyInput.max_pages) || 80, 5), 1000),
-    evidenceTarget: Math.min(Math.max(Number(policyInput.evidenceTarget ?? policyInput.evidence_target) || 60, 1), 5000),
-    minMarginalYield: Math.max(0, Number(policyInput.minMarginalYield ?? policyInput.min_marginal_yield) || 0.25),
-    maxDuplicateRate: Math.min(Math.max(Number(policyInput.maxDuplicateRate ?? policyInput.max_duplicate_rate) || 0.45, 0), 1),
-    maxBlockedShare: Math.min(Math.max(Number(policyInput.maxBlockedShare ?? policyInput.max_blocked_share) || 0.55, 0), 1),
+    maxPages: Math.min(Math.max(finiteOr(policyInput.maxPages ?? policyInput.max_pages, 80), 5), 1000),
+    evidenceTarget: Math.min(Math.max(finiteOr(policyInput.evidenceTarget ?? policyInput.evidence_target, 60), 1), 5000),
+    minMarginalYield: Math.max(0, finiteOr(policyInput.minMarginalYield ?? policyInput.min_marginal_yield, 0.25)),
+    maxDuplicateRate: Math.min(Math.max(finiteOr(policyInput.maxDuplicateRate ?? policyInput.max_duplicate_rate, 0.45), 0), 1),
+    maxBlockedShare: Math.min(Math.max(finiteOr(policyInput.maxBlockedShare ?? policyInput.max_blocked_share, 0.55), 0), 1),
   };
   const pagesVisited = Math.max(0, Number(stats.pagesVisited ?? stats.pages_visited) || 0);
   const evidenceAdded = Math.max(0, Number(stats.evidenceAdded ?? stats.evidence_added) || 0);
   const duplicateRate = clamp((Number(stats.duplicateRate ?? stats.duplicate_rate) || 0) * 100) / 100;
   const blockedShare = clamp((Number(stats.blockedShare ?? stats.blocked_share) || 0) * 100) / 100;
-  const recentYields = Array.isArray(stats.recentEvidenceYields ?? stats.recent_evidence_yields) ? (stats.recentEvidenceYields ?? stats.recent_evidence_yields).map(Number).filter(Number.isFinite).slice(-8) : [];
+  const recentYields = Array.isArray(stats.recentEvidenceYields ?? stats.recent_evidence_yields)
+    ? (stats.recentEvidenceYields ?? stats.recent_evidence_yields).map(Number).filter(Number.isFinite).slice(-8)
+    : [];
   const recentAverage = recentYields.length ? recentYields.reduce((sum, value) => sum + value, 0) / recentYields.length : null;
   const frontierCount = Math.max(0, Number(stats.frontierCount ?? stats.frontier_count) || 0);
+  const retryLaterCount = Math.max(0, Number(stats.retryLaterCount ?? stats.retry_later_count) || 0);
 
   if (evidenceAdded >= policy.evidenceTarget && pagesVisited >= 8) return { stop: true, reason: 'evidence-target-reached', recentAverageYield: recentAverage };
   if (pagesVisited >= policy.maxPages) return { stop: true, reason: 'page-budget-reached', recentAverageYield: recentAverage };
+  if (frontierCount === 0 && retryLaterCount > 0) return { stop: false, reason: 'waiting-for-retry', recentAverageYield: recentAverage == null ? null : round(recentAverage, 3) };
   if (frontierCount === 0 && pagesVisited > 0) return { stop: true, reason: 'frontier-exhausted', recentAverageYield: recentAverage };
   if (recentYields.length >= 5 && recentAverage < policy.minMarginalYield) return { stop: true, reason: 'marginal-yield-collapsed', recentAverageYield: round(recentAverage, 3) };
   if (pagesVisited >= 10 && duplicateRate > policy.maxDuplicateRate) return { stop: true, reason: 'duplicate-saturation', recentAverageYield: recentAverage };
