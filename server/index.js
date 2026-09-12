@@ -2,6 +2,7 @@ import cors from 'cors';
 import dotenv from 'dotenv';
 import express from 'express';
 import mongoose from 'mongoose';
+import { createPainScanRouter } from './painScanRoutes.js';
 
 dotenv.config();
 
@@ -18,6 +19,7 @@ if (!mongoUri) {
 
 app.use(cors({ origin: allowedOrigin }));
 app.use(express.json({ limit: '2mb' }));
+app.use('/api/pain-scans', createPainScanRouter());
 
 const redditPostSchema = new mongoose.Schema(
   {
