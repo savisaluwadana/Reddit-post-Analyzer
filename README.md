@@ -1,8 +1,26 @@
 # Reddit Conversation Signal Lab
 
-A Reddit research and market-intelligence dashboard for finding high-signal conversations, repeated pain points and emerging opportunities across multiple subreddits.
+A Reddit research and market-intelligence dashboard for finding high-signal conversations, repeated pain points, costly workarounds and product opportunities across multiple subreddits.
 
 ## What it does
+
+### Deep pain-point intelligence
+
+The Pain Point Lab goes beyond post sentiment and looks for evidence that a problem is real, recurring and commercially meaningful.
+
+- Builds an immediate pain preview from post titles and self text
+- Deep-scans top Reddit comment threads on demand
+- Scores pain across severity, recurrence, commercial intent, urgency and workaround burden
+- Detects manual workflows, spreadsheets, scripts, hacks and homegrown workarounds
+- Detects switching, alternative-seeking, pricing and willingness-to-pay language
+- Groups evidence into recurring pain clusters instead of isolated complaints
+- Measures confidence from evidence volume, distinct threads, comment corroboration and cross-subreddit recurrence
+- Detects likely affected personas such as platform engineers, SREs, developers, founders, security teams and data engineers
+- Categorizes pain into manual work, integrations, reliability, performance, cost, usability, observability, security/compliance, onboarding, workflow/process, missing capability, support and migration
+- Shows the exact Reddit posts/comments behind every cluster score
+- Exports the current pain report as readable text or JSON for downstream research
+
+The pain score is intentionally transparent. A high score requires multiple useful signals rather than generic negative sentiment.
 
 ### Live conversation intelligence
 
@@ -32,20 +50,29 @@ Use the project library in the dashboard to load a saved research configuration 
 
 ### Historical momentum tracking
 
-Saving fetched posts now records an hourly snapshot of their score and comment count. These snapshots power:
+Saving fetched posts records an hourly snapshot of score and comment count. These snapshots power:
 
 - Daily average score history
 - Daily average comment history
 - Number of tracked posts
-- Score movement across the selected window
-- Comment movement across the selected window
+- Score and comment movement across the selected window
 - Top posts gaining momentum
 - Optional subreddit-specific trend views
 - 7, 14, 30, 60 and 90 day analysis windows
 
-Snapshots are deduplicated to one record per Reddit post per hour. They expire automatically according to `SNAPSHOT_RETENTION_DAYS` so history does not grow forever by default.
+Snapshots are deduplicated to one record per Reddit post per hour and expire according to `SNAPSHOT_RETENTION_DAYS`.
 
-> The opportunity score is a transparent heuristic, not an AI prediction. It is designed to help prioritize what to inspect manually.
+## Pain scoring model
+
+Each evidence item is evaluated across five core dimensions:
+
+1. **Severity** — frustration, failure, blocking language and engagement strength.
+2. **Recurrence** — repeated evidence across distinct threads, comments and subreddits.
+3. **Commercial intent** — pricing, budget, buying, replacement, migration and alternative-seeking language.
+4. **Urgency** — production impact, deadlines, blockers, incidents and time-sensitive language.
+5. **Workaround burden** — manual steps, spreadsheets, scripts, copy/paste, cron jobs, hacks and homegrown tooling.
+
+Cluster confidence increases when the same pain appears in multiple threads/subreddits and is corroborated by comments. This is a heuristic prioritization system, not a prediction of market success.
 
 ## Setup
 
@@ -73,6 +100,8 @@ npm run server
 npm run dev
 ```
 
+The Vite development server proxies `/api` to the Node API and `/reddit` to Reddit for public JSON requests used by post collection and deep comment scans.
+
 ## API
 
 ### Health
@@ -97,15 +126,7 @@ Posts are upserted by Reddit ID. The same request also upserts one historical sn
 GET /api/posts
 ```
 
-Supported query parameters:
-
-- `subreddit`
-- `q` for MongoDB text search
-- `minScore`
-- `minComments`
-- `sort=createdUtc|score|numComments|lastFetchedAt`
-- `order=asc|desc`
-- `limit` up to 500
+Supported query parameters include `subreddit`, `q`, `minScore`, `minComments`, `sort`, `order` and `limit`.
 
 Example:
 
@@ -119,21 +140,6 @@ Example:
 GET /api/projects
 POST /api/projects
 DELETE /api/projects/:id
-```
-
-Example project body:
-
-```json
-{
-  "name": "Platform engineering pain points",
-  "description": "Track recurring operational friction and tool-switching intent",
-  "subreddits": ["devops", "kubernetes"],
-  "keywords": ["manual", "cost", "alternative"],
-  "minScore": 5,
-  "minComments": 5,
-  "signalFilter": "pain",
-  "sortMode": "opportunity"
-}
 ```
 
 ### Historical trends
@@ -153,8 +159,18 @@ The application currently uses three MongoDB collections:
 - `PostSnapshot` — hourly historical engagement snapshots
 - `ResearchProject` — reusable research configurations
 
+Deep comment evidence is analyzed in the research session and can be exported as JSON. A future persistence layer can store versioned pain scans for long-term comparison.
+
+## Validation
+
+Pull requests run GitHub Actions CI with:
+
+```text
+npm ci
+npm run lint
+npm run build
+```
+
 ## Current direction
 
-This project is evolving from a simple Reddit extractor into a broader conversation-intelligence product for product research, developer relations, market research, community analysis and SaaS opportunity discovery.
-
-Logical next phases include Reddit OAuth/server-side ingestion, scheduled project runs, alerts for newly emerging signals, cross-project trend comparison, semantic clustering and optional LLM-assisted summaries.
+The project is evolving into a dedicated pain-point and opportunity research system. Logical next phases include authenticated Reddit server-side ingestion, scheduled project scans, pain-cluster history, alerts when a problem crosses a confidence/intent threshold, semantic clustering and optional grounded LLM summaries.
