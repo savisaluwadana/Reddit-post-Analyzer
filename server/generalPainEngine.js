@@ -1,19 +1,8 @@
-import type {
-  PainCategory,
-  PainCategoryBreakdown,
-  PainCluster,
-  PainEvidence,
-  PainScanResult,
-  RedditComment,
-  RedditPost,
-} from '../types';
-import { calculatePostIntelligence } from './analytics';
-
 const STOP_WORDS = new Set([
-  'about','after','again','also','and','are','because','been','before','being','between','but','can','could','did','does','doing','for','from','had','has','have','having','here','how','into','just','more','most','not','now','only','other','our','out','over','same','should','some','such','than','that','the','their','them','then','there','these','they','this','those','through','too','under','until','very','was','were','what','when','where','which','while','who','why','will','with','would','you','your','reddit','http','https','www','com','really','thing','things','using','use','used','like','get','getting','got','make','made','want','trying','try','anyone','someone','something','much','many','still','even','way','work','working'
+  'about','after','again','also','and','are','because','been','before','being','between','both','but','can','could','did','does','doing','each','for','from','had','has','have','having','here','how','into','its','just','more','most','not','now','only','other','our','out','over','same','should','some','such','than','that','the','their','them','then','there','these','they','this','those','through','too','under','until','very','was','were','what','when','where','which','while','who','why','will','with','would','you','your','http','https','www','com','really','thing','things','using','used','like','get','getting','got','make','made','want','trying','try','anyone','someone','something','much','many','still','even','way','work','working'
 ]);
 
-const CATEGORY_RULES: Record<PainCategory, { label: string; terms: string[] }> = {
+export const PAIN_CATEGORY_RULES = {
   'manual-work': { label: 'Manual work & repetitive tasks', terms: ['manual','manually','copy paste','copy/paste','spreadsheet','excel','google sheets','paperwork','data entry','repetitive','tedious','by hand','double entry','rekey'] },
   integration: { label: 'Integration & interoperability', terms: ['integration','integrate','sync','connector','plugin','api','webhook','incompatible','compatibility','does not connect','doesn\'t connect','import export'] },
   reliability: { label: 'Reliability & failures', terms: ['unreliable','broken','fails','failed','failure','crash','outage','unstable','keeps breaking','does not work','doesn\'t work','error','errors'] },
@@ -42,7 +31,7 @@ const URGENCY_TERMS = ['urgent','asap','immediately','today','deadline','blocked
 const WORKAROUND_TERMS = ['workaround','manual','manually','spreadsheet','excel','google sheets','paper','notebook','script','cron','copy paste','copy/paste','hack','custom script','homegrown','built our own','building our own','doing it by hand','email chain','whatsapp','multiple apps','separate app'];
 const PAIN_CONTEXT_TERMS = ['problem','issue','pain','painful','frustrating','frustrated','hate','broken','fails','failed','difficult','hard','slow','manual','annoying','struggling','expensive','costly','waste','blocked','bug','missing','cannot','can\'t','doesn\'t work','does not work','need help','wish','need a better','looking for','unavailable','inaccurate','delayed','no response','no reply','refund'];
 
-const PERSONA_RULES: Array<{ persona: string; terms: string[] }> = [
+const PERSONA_RULES = [
   { persona: 'Consumer / customer', terms: ['customer','consumer','buyer','shopper','user','as a customer','my family','parent','patient'] },
   { persona: 'Small business owner', terms: ['small business','business owner','shop owner','store owner','merchant','sme','our shop','my business'] },
   { persona: 'Founder / operator', terms: ['founder','startup','cofounder','co-founder','our company','operator'] },
@@ -68,11 +57,11 @@ const PERSONA_RULES: Array<{ persona: string; terms: string[] }> = [
   { persona: 'Freelancer / agency', terms: ['freelancer','agency','client work','consulting business','independent contractor'] },
 ];
 
-const clamp = (value: number) => Math.min(100, Math.max(0, value));
-const countMatches = (text: string, terms: string[]) => terms.reduce((count, term) => count + (text.includes(term) ? 1 : 0), 0);
+const clamp = (value) => Math.min(100, Math.max(0, Number(value) || 0));
+const countMatches = (text, terms) => terms.reduce((count, term) => count + (text.includes(term) ? 1 : 0), 0);
 
-function tokenize(text: string) {
-  return text
+function tokenize(text) {
+  return String(text || '')
     .toLowerCase()
     .replace(/https?:\/\/\S+/g, ' ')
     .replace(/[^a-z0-9+#.-]/g, ' ')
@@ -80,59 +69,80 @@ function tokenize(text: string) {
     .filter((token) => token.length >= 4 && token.length <= 28 && !STOP_WORDS.has(token) && !/^\d+$/.test(token));
 }
 
-function extractKeywords(text: string, limit = 8) {
-  const counts = new Map<string, number>();
-  tokenize(text).forEach((token) => counts.set(token, (counts.get(token) ?? 0) + 1));
+function extractKeywords(text, limit = 8) {
+  const counts = new Map();
+  tokenize(text).forEach((token) => counts.set(token, (counts.get(token) || 0) + 1));
   return [...counts.entries()].sort((a, b) => b[1] - a[1]).slice(0, limit).map(([token]) => token);
 }
 
-function detectPersonas(text: string) {
+function detectPersonas(text) {
   const matches = PERSONA_RULES.filter((rule) => rule.terms.some((term) => text.includes(term))).map((rule) => rule.persona);
-  return matches.length > 0 ? matches.slice(0, 4) : ['End user / practitioner'];
+  return matches.length ? matches.slice(0, 4) : ['End user / practitioner'];
 }
 
-function scoreDimension(text: string, terms: string[], multiplier: number) {
-  return clamp(countMatches(text, terms) * multiplier);
+function average(values) {
+  return values.length ? values.reduce((sum, value) => sum + value, 0) / values.length : 0;
 }
 
-function evidenceFromText(
-  sourceType: 'post' | 'comment',
-  postId: string,
-  subreddit: string,
-  author: string,
-  rawText: string,
-  permalink: string | undefined,
-  score: number,
-): PainEvidence[] {
-  const text = rawText.toLowerCase();
-  const severityMatches = countMatches(text, PAIN_CONTEXT_TERMS) + countMatches(text, SEVERITY_TERMS);
-  const commercialIntent = scoreDimension(text, COMMERCIAL_TERMS, 22);
-  const urgency = scoreDimension(text, URGENCY_TERMS, 24);
-  const workaroundBurden = scoreDimension(text, WORKAROUND_TERMS, 22);
-  const severity = clamp(severityMatches * 11 + Math.min(Math.log1p(Math.max(score, 0)) * 3, 14));
+function peakBlend(values) {
+  if (!values.length) return 0;
+  return Math.round(clamp(Math.max(...values) * 0.65 + average(values) * 0.35));
+}
+
+function sourceKey(item) {
+  return `${item.sourceKind}:${item.sourceName}:${item.externalId || item.url || ''}:${item.text.slice(0, 100)}`;
+}
+
+function normalizeInput(item, index) {
+  const text = `${item?.title || ''}\n${item?.text || item?.body || item?.content || ''}`.trim();
+  return {
+    externalId: String(item?.externalId || item?.external_id || item?.id || `evidence-${index}`),
+    sourceKind: String(item?.sourceKind || item?.source_kind || 'web'),
+    sourceName: String(item?.sourceName || item?.source_name || item?.platform || 'web'),
+    community: String(item?.community || item?.subreddit || item?.forum || ''),
+    author: String(item?.author || 'unknown'),
+    title: String(item?.title || ''),
+    text,
+    url: String(item?.url || item?.permalink || ''),
+    engagementScore: Number(item?.engagementScore ?? item?.engagement_score ?? item?.score ?? item?.likes ?? 0) || 0,
+    publishedAt: item?.publishedAt || item?.published_at || null,
+    tags: Array.isArray(item?.tags) ? item.tags.map(String).slice(0, 20) : [],
+  };
+}
+
+function evidenceFromItem(item) {
+  if (!item.text) return [];
+  const lower = item.text.toLowerCase();
+  const severityMatches = countMatches(lower, PAIN_CONTEXT_TERMS) + countMatches(lower, SEVERITY_TERMS);
+  const commercialIntent = clamp(countMatches(lower, COMMERCIAL_TERMS) * 22);
+  const urgency = clamp(countMatches(lower, URGENCY_TERMS) * 25);
+  const workaroundBurden = clamp(countMatches(lower, WORKAROUND_TERMS) * 22);
+  const severity = clamp(severityMatches * 11 + Math.min(Math.log1p(Math.max(item.engagementScore, 0)) * 4, 14));
 
   if (severityMatches === 0 && commercialIntent === 0 && urgency === 0 && workaroundBurden === 0) return [];
 
-  const categories = (Object.entries(CATEGORY_RULES) as Array<[PainCategory, { label: string; terms: string[] }]>)
-    .map(([category, rule]) => ({ category, matches: countMatches(text, rule.terms) }))
-    .filter((item) => item.matches > 0)
+  const categories = Object.entries(PAIN_CATEGORY_RULES)
+    .map(([category, rule]) => ({ category, matches: countMatches(lower, rule.terms) }))
+    .filter((entry) => entry.matches > 0)
     .sort((a, b) => b.matches - a.matches)
     .slice(0, 2);
 
-  if (categories.length === 0) categories.push({ category: 'usability', matches: 1 });
-
-  const personas = detectPersonas(text);
-  const keywords = extractKeywords(rawText);
-  const cleanText = rawText.replace(/\s+/g, ' ').trim().slice(0, 420);
+  if (!categories.length) categories.push({ category: 'usability', matches: 1 });
+  const personas = detectPersonas(lower);
+  const keywords = extractKeywords(item.text);
+  const excerpt = item.text.replace(/\s+/g, ' ').trim().slice(0, 520);
 
   return categories.map(({ category }) => ({
-    sourceType,
-    postId,
-    subreddit,
-    author,
-    text: cleanText,
-    permalink,
-    score,
+    sourceKind: item.sourceKind,
+    sourceName: item.sourceName,
+    externalId: item.externalId,
+    community: item.community,
+    author: item.author,
+    title: item.title.slice(0, 220),
+    text: excerpt,
+    url: item.url,
+    engagementScore: item.engagementScore,
+    publishedAt: item.publishedAt,
     category,
     severity,
     commercialIntent,
@@ -143,76 +153,63 @@ function evidenceFromText(
   }));
 }
 
-function sourceKey(evidence: PainEvidence) {
-  return `${evidence.sourceType}:${evidence.postId}:${evidence.author}:${evidence.text.slice(0, 96)}`;
-}
-
-function average(values: number[]) {
-  return values.length ? values.reduce((sum, value) => sum + value, 0) / values.length : 0;
-}
-
-function peakBlend(values: number[]) {
-  if (values.length === 0) return 0;
-  return Math.round(clamp(Math.max(...values) * 0.65 + average(values) * 0.35));
-}
-
-function createReason(cluster: Omit<PainCluster, 'opportunityReason'>) {
-  const reasons: string[] = [];
-  if (cluster.recurrence >= 60) reasons.push('repeats across multiple conversations');
+function createReason(cluster) {
+  const reasons = [];
+  if (cluster.recurrence >= 60) reasons.push('the problem repeats across independent evidence');
+  if (cluster.distinctSources >= 2) reasons.push('it appears across multiple sources');
   if (cluster.commercialIntent >= 45) reasons.push('people show spending, switching, cancellation, or alternative-seeking intent');
-  if (cluster.workaroundBurden >= 40) reasons.push('people rely on manual or improvised workarounds');
-  if (cluster.urgency >= 45) reasons.push('the pain is blocking or time-sensitive');
+  if (cluster.workaroundBurden >= 40) reasons.push('people are compensating with manual or improvised workarounds');
+  if (cluster.urgency >= 45) reasons.push('the problem is time-sensitive or blocking outcomes');
   if (cluster.severity >= 60) reasons.push('language indicates strong frustration or failure');
-  if (reasons.length === 0) reasons.push('multiple evidence signals make this worth manual validation');
-  return reasons.join('; ');
+  return (reasons.length ? reasons : ['the evidence is strong enough to warrant direct customer validation']).join('; ');
 }
 
-function buildClusters(evidence: PainEvidence[]) {
-  const categoryGroups = new Map<PainCategory, PainEvidence[]>();
-  evidence.forEach((item) => categoryGroups.set(item.category, [...(categoryGroups.get(item.category) ?? []), item]));
-  const clusters: PainCluster[] = [];
+function buildClusters(evidence) {
+  const groups = new Map();
+  evidence.forEach((item) => groups.set(item.category, [...(groups.get(item.category) || []), item]));
+  const clusters = [];
 
-  categoryGroups.forEach((items, category) => {
-    const documentFrequency = new Map<string, number>();
-    items.forEach((item) => new Set(item.keywords).forEach((keyword) => documentFrequency.set(keyword, (documentFrequency.get(keyword) ?? 0) + 1)));
-    const recurringKeywords = [...documentFrequency.entries()].filter(([, count]) => count >= 2).sort((a, b) => b[1] - a[1]).slice(0, 5).map(([keyword]) => keyword);
-    const buckets = new Map<string, PainEvidence[]>();
+  groups.forEach((items, category) => {
+    const frequency = new Map();
+    items.forEach((item) => new Set(item.keywords).forEach((keyword) => frequency.set(keyword, (frequency.get(keyword) || 0) + 1)));
+    const recurringKeywords = [...frequency.entries()].filter(([, count]) => count >= 2).sort((a, b) => b[1] - a[1]).slice(0, 5).map(([keyword]) => keyword);
+    const buckets = new Map();
+
     items.forEach((item) => {
-      const primary = recurringKeywords.find((keyword) => item.keywords.includes(keyword)) ?? 'general';
-      buckets.set(primary, [...(buckets.get(primary) ?? []), item]);
+      const primary = recurringKeywords.find((keyword) => item.keywords.includes(keyword)) || 'general';
+      buckets.set(primary, [...(buckets.get(primary) || []), item]);
     });
 
     buckets.forEach((bucket, primary) => {
-      const uniqueSources = new Map<string, PainEvidence>();
-      bucket.forEach((item) => uniqueSources.set(sourceKey(item), item));
-      const unique = [...uniqueSources.values()];
-      const distinctPosts = new Set(unique.map((item) => item.postId)).size;
-      const distinctSubreddits = new Set(unique.map((item) => item.subreddit)).size;
-      const recurrence = Math.round(clamp(distinctPosts * 18 + unique.length * 5 + distinctSubreddits * 8));
+      const uniqueMap = new Map();
+      bucket.forEach((item) => uniqueMap.set(sourceKey(item), item));
+      const unique = [...uniqueMap.values()];
+      const distinctSources = new Set(unique.map((item) => `${item.sourceKind}:${item.sourceName}`)).size;
+      const distinctCommunities = new Set(unique.map((item) => item.community).filter(Boolean)).size;
+      const distinctEvidence = new Set(unique.map((item) => item.externalId || item.url || item.text.slice(0, 60))).size;
+      const recurrence = Math.round(clamp(distinctEvidence * 13 + unique.length * 4 + distinctSources * 12 + distinctCommunities * 5));
       const severity = Math.round(average(unique.map((item) => item.severity)));
       const commercialIntent = peakBlend(unique.map((item) => item.commercialIntent));
       const urgency = peakBlend(unique.map((item) => item.urgency));
       const workaroundBurden = peakBlend(unique.map((item) => item.workaroundBurden));
-      const commentEvidence = unique.filter((item) => item.sourceType === 'comment').length;
-      const confidence = Math.round(clamp(unique.length * 7 + distinctPosts * 10 + distinctSubreddits * 12 + Math.min(commentEvidence * 2, 20)));
+      const confidence = Math.round(clamp(unique.length * 6 + distinctEvidence * 8 + distinctSources * 14 + distinctCommunities * 5));
       const painScore = Math.round(clamp(severity * 0.28 + recurrence * 0.27 + commercialIntent * 0.18 + urgency * 0.13 + workaroundBurden * 0.14));
 
-      const personaCounts = new Map<string, number>();
-      const keywordCounts = new Map<string, number>();
+      const personaCounts = new Map();
+      const keywordCounts = new Map();
       unique.forEach((item) => {
-        item.personas.forEach((persona) => personaCounts.set(persona, (personaCounts.get(persona) ?? 0) + 1));
-        item.keywords.forEach((keyword) => keywordCounts.set(keyword, (keywordCounts.get(keyword) ?? 0) + 1));
+        item.personas.forEach((persona) => personaCounts.set(persona, (personaCounts.get(persona) || 0) + 1));
+        item.keywords.forEach((keyword) => keywordCounts.set(keyword, (keywordCounts.get(keyword) || 0) + 1));
       });
 
       const personas = [...personaCounts.entries()].sort((a, b) => b[1] - a[1]).slice(0, 5).map(([persona]) => persona);
       const keywords = [...keywordCounts.entries()].sort((a, b) => b[1] - a[1]).slice(0, 10).map(([keyword]) => keyword);
-      const categoryLabel = CATEGORY_RULES[category].label;
-      const label = primary === 'general' ? categoryLabel : `${categoryLabel}: ${primary}`;
+      const label = primary === 'general' ? PAIN_CATEGORY_RULES[category].label : `${PAIN_CATEGORY_RULES[category].label}: ${primary}`;
       const rankedEvidence = [...unique]
-        .sort((a, b) => (b.severity + b.commercialIntent + b.urgency + b.workaroundBurden + Math.log1p(Math.max(b.score, 0)) * 4) - (a.severity + a.commercialIntent + a.urgency + a.workaroundBurden + Math.log1p(Math.max(a.score, 0)) * 4))
-        .slice(0, 6);
+        .sort((a, b) => (b.severity + b.commercialIntent + b.urgency + b.workaroundBurden + Math.log1p(Math.max(b.engagementScore, 0)) * 4) - (a.severity + a.commercialIntent + a.urgency + a.workaroundBurden + Math.log1p(Math.max(a.engagementScore, 0)) * 4))
+        .slice(0, 8);
 
-      const partial: Omit<PainCluster, 'opportunityReason'> = {
+      const cluster = {
         id: `${category}:${primary}`,
         category,
         label,
@@ -224,72 +221,54 @@ function buildClusters(evidence: PainEvidence[]) {
         workaroundBurden,
         confidence,
         evidenceCount: unique.length,
-        distinctPosts,
-        distinctSubreddits,
+        distinctSources,
+        distinctCommunities,
         personas,
         keywords,
         evidence: rankedEvidence,
       };
-      clusters.push({ ...partial, opportunityReason: createReason(partial) });
+      clusters.push({ ...cluster, opportunityReason: createReason(cluster) });
     });
   });
 
-  return clusters
-    .filter((cluster) => cluster.evidenceCount >= 1)
-    .sort((a, b) => (b.painScore + b.confidence * 0.15) - (a.painScore + a.confidence * 0.15));
+  return clusters.sort((a, b) => (b.painScore + b.confidence * 0.15) - (a.painScore + a.confidence * 0.15));
 }
 
-export function buildPainScan(posts: RedditPost[], comments: RedditComment[] = [], errors: string[] = []): PainScanResult {
-  const evidence: PainEvidence[] = [];
-
-  posts.forEach((post) => {
-    const text = `${post.title}\n${post.selftext ?? ''}`;
-    evidence.push(...evidenceFromText('post', post.id, post.subreddit, post.author, text, `https://reddit.com${post.permalink}`, post.score));
-  });
-
-  comments.forEach((comment) => {
-    evidence.push(...evidenceFromText('comment', comment.postId, comment.subreddit, comment.author, comment.body, comment.permalink ? `https://reddit.com${comment.permalink}` : undefined, comment.score));
-  });
-
-  const uniqueSourceEvidence = new Map<string, PainEvidence>();
-  evidence.forEach((item) => uniqueSourceEvidence.set(sourceKey(item), item));
-  const uniqueSources = [...uniqueSourceEvidence.values()];
+export function analyzeGeneralEvidence(rawItems = []) {
+  const items = rawItems.map(normalizeInput).filter((item) => item.text.length >= 8);
+  const evidence = items.flatMap(evidenceFromItem);
   const clusters = buildClusters(evidence);
+  const sourceKinds = new Map();
+  const sourceNames = new Map();
+  const personaCounts = new Map();
+  const categoryMap = new Map();
 
-  const categoryMap = new Map<PainCategory, PainCluster[]>();
-  clusters.forEach((cluster) => categoryMap.set(cluster.category, [...(categoryMap.get(cluster.category) ?? []), cluster]));
-  const categories: PainCategoryBreakdown[] = [...categoryMap.entries()]
-    .map(([category, categoryClusters]) => ({
+  items.forEach((item) => {
+    sourceKinds.set(item.sourceKind, (sourceKinds.get(item.sourceKind) || 0) + 1);
+    sourceNames.set(item.sourceName, (sourceNames.get(item.sourceName) || 0) + 1);
+  });
+  evidence.forEach((item) => item.personas.forEach((persona) => personaCounts.set(persona, (personaCounts.get(persona) || 0) + 1)));
+  clusters.forEach((cluster) => categoryMap.set(cluster.category, [...(categoryMap.get(cluster.category) || []), cluster]));
+
+  const categories = [...categoryMap.entries()]
+    .map(([category, values]) => ({
       category,
-      evidenceCount: categoryClusters.reduce((sum, cluster) => sum + cluster.evidenceCount, 0),
-      painScore: Math.round(average(categoryClusters.map((cluster) => cluster.painScore))),
+      evidenceCount: values.reduce((sum, cluster) => sum + cluster.evidenceCount, 0),
+      painScore: Math.round(average(values.map((cluster) => cluster.painScore))),
     }))
     .sort((a, b) => b.painScore - a.painScore);
 
-  const personaCounts = new Map<string, number>();
-  uniqueSources.forEach((item) => item.personas.forEach((persona) => personaCounts.set(persona, (personaCounts.get(persona) ?? 0) + 1)));
-
   return {
     generatedAt: new Date().toISOString(),
-    postsScanned: posts.length,
-    commentsScanned: comments.length,
-    painPosts: new Set(uniqueSources.filter((item) => item.sourceType === 'post').map((item) => item.postId)).size,
-    painComments: uniqueSources.filter((item) => item.sourceType === 'comment').length,
-    highIntentEvidence: uniqueSources.filter((item) => item.commercialIntent >= 35).length,
-    workaroundEvidence: uniqueSources.filter((item) => item.workaroundBurden >= 35).length,
+    evidenceScanned: items.length,
+    painEvidence: new Set(evidence.map(sourceKey)).size,
+    highIntentEvidence: evidence.filter((item) => item.commercialIntent >= 35).length,
+    workaroundEvidence: evidence.filter((item) => item.workaroundBurden >= 35).length,
+    sourcesScanned: sourceNames.size,
+    sourceKinds: [...sourceKinds.entries()].map(([sourceKind, count]) => ({ sourceKind, count })).sort((a, b) => b.count - a.count),
+    sourceNames: [...sourceNames.entries()].map(([sourceName, count]) => ({ sourceName, count })).sort((a, b) => b.count - a.count).slice(0, 20),
     clusters,
     categories,
     topPersonas: [...personaCounts.entries()].sort((a, b) => b[1] - a[1]).slice(0, 12).map(([persona, mentions]) => ({ persona, mentions })),
-    errors,
   };
-}
-
-export function rankPostsForPainScan(posts: RedditPost[]) {
-  return [...posts].sort((a, b) => {
-    const aIntel = calculatePostIntelligence(a);
-    const bIntel = calculatePostIntelligence(b);
-    const aRank = aIntel.painScore * 4 + aIntel.buyingIntentScore * 3 + Math.log1p(a.num_comments ?? 0) * 10 + aIntel.opportunityScore;
-    const bRank = bIntel.painScore * 4 + bIntel.buyingIntentScore * 3 + Math.log1p(b.num_comments ?? 0) * 10 + bIntel.opportunityScore;
-    return bRank - aRank;
-  });
 }

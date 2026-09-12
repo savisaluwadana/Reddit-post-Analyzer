@@ -1,5 +1,6 @@
 import { useEffect, useMemo, useState } from 'react';
 import { Controls } from './components/Controls';
+import { CrossSourceIntelligencePanel } from './components/CrossSourceIntelligencePanel';
 import { CsvVisualizer } from './components/CsvVisualizer';
 import { IntelligencePanel } from './components/IntelligencePanel';
 import { PainPointLab } from './components/PainPointLab';
@@ -209,15 +210,23 @@ function App() {
   return (
     <div className="container app-shell">
       <header className="hero-header">
-        <div className="hero-kicker">Reddit pain-point intelligence</div>
-        <h1 className="header-title">Conversation Signal Lab</h1>
+        <div className="hero-kicker">Cross-source pain intelligence</div>
+        <h1 className="header-title">Pain Intelligence Lab</h1>
         <p className="header-desc">
-          Discover recurring pain, costly manual work, unmet needs, switching intent and high-value product opportunities across Reddit conversations.
+          Turn public conversations, reviews, forums, issues, support threads and community discussions into evidence-backed pain points, unmet needs and product opportunities.
         </p>
-        <div className="hero-note">Transparent scoring • Saved research projects • Historical momentum • Comment-level deep pain scans</div>
+        <div className="hero-note">MCP-ready • Multi-source evidence • Transparent scoring • Historical movement • Reddit built in as one connector</div>
       </header>
 
       <main>
+        <CrossSourceIntelligencePanel />
+
+        <div className="source-connector-divider">
+          <span>Built-in source connector</span>
+          <strong>Reddit deep research</strong>
+          <p>Use the native Reddit collector below, or use Codex / Claude Code through MCP to research any public source and feed the cross-source evidence layer above.</p>
+        </div>
+
         <Controls
           subreddits={subreddits}
           setSubreddits={setSubreddits}

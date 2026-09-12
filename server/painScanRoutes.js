@@ -4,6 +4,7 @@ import mongoose from 'mongoose';
 const PAIN_CATEGORIES = new Set([
   'manual-work', 'integration', 'reliability', 'performance', 'cost', 'usability', 'visibility',
   'security-compliance', 'setup-onboarding', 'workflow-process', 'missing-capability', 'support', 'data-migration',
+  'access-availability', 'quality', 'communication', 'billing-payments', 'fulfillment-logistics', 'trust-safety', 'discovery-comparison',
 ]);
 
 const clampScore = (value) => Math.min(Math.max(Number(value) || 0, 0), 100);
