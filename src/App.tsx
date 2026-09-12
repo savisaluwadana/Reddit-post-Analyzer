@@ -4,6 +4,7 @@ import { CrossSourceIntelligencePanel } from './components/CrossSourceIntelligen
 import { CsvVisualizer } from './components/CsvVisualizer';
 import { HostIntelligencePanel } from './components/HostIntelligencePanel';
 import { IntelligencePanel } from './components/IntelligencePanel';
+import { OpportunityOsPanel } from './components/OpportunityOsPanel';
 import { PainPointLab } from './components/PainPointLab';
 import { PostList } from './components/PostList';
 import { QualityIntelligencePanel } from './components/QualityIntelligencePanel';
@@ -218,13 +219,14 @@ function App() {
         <p className="header-desc">
           Turn public conversations, reviews, forums, issues, support threads and community discussions into evidence-backed pain points, jobs-to-be-done, competitor intelligence and product opportunities.
         </p>
-        <div className="hero-note">MCP-hosted LLM reasoning • No model API key • Multi-source evidence • Semantic clustering • JTBD + entities • Historical movement</div>
+        <div className="hero-note">MCP-hosted LLM reasoning • No model API key • Multi-source evidence • Semantic clustering • Validation experiments • Opportunity OS</div>
       </header>
 
       <main>
         <CrossSourceIntelligencePanel />
         <HostIntelligencePanel />
         <QualityIntelligencePanel />
+        <OpportunityOsPanel />
 
         <div className="source-connector-divider">
           <span>Built-in source connector</span>
