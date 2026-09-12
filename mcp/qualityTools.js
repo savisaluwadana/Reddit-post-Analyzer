@@ -1,3 +1,5 @@
+import { callOpportunityOsTool, opportunityOsTools } from './opportunityTools.js';
+
 const rangeSchema = {
   type: 'object',
   additionalProperties: false,
@@ -87,9 +89,13 @@ export const qualityIntelligenceTools = [
       },
     },
   },
+  ...opportunityOsTools,
 ];
 
 export async function callQualityIntelligenceTool(name, args, requestJson) {
+  const opportunityTool = await callOpportunityOsTool(name, args, requestJson);
+  if (opportunityTool.handled) return opportunityTool;
+
   const runId = args?.run_id ? encodeURIComponent(args.run_id) : '';
 
   if (name === 'get_research_quality_summary') {
