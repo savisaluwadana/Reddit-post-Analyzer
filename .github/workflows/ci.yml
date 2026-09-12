@@ -36,7 +36,10 @@ jobs:
           node --check server/generalPainEngine.js
           node --check server/hostIntelligenceRoutes.js
           node --check server/researchJobRoutes.js
+          node --check server/researchSearchPlanner.js
+          node --check server/researchSearchRoutes.js
           node --check mcp/hostTools.js
+          node --check mcp/searchTools.js
           node --check mcp/server.js
 
       - name: MCP stdio smoke test
@@ -50,6 +53,12 @@ jobs:
           echo "$OUTPUT" | grep '"name":"analyze_pain_points"'
           echo "$OUTPUT" | grep '"name":"create_research_job"'
           echo "$OUTPUT" | grep '"name":"claim_research_job"'
+          echo "$OUTPUT" | grep '"name":"get_research_search_plan"'
+          echo "$OUTPUT" | grep '"name":"get_deep_scrape_plan"'
+          echo "$OUTPUT" | grep '"name":"record_deep_scrape_result"'
+          echo "$OUTPUT" | grep '"name":"record_research_search_progress"'
+          echo "$OUTPUT" | grep '"name":"evaluate_research_evidence_quality"'
+          echo "$OUTPUT" | grep '"name":"get_research_search_memory"'
           echo "$OUTPUT" | grep '"name":"evaluate_research_job_coverage"'
           echo "$OUTPUT" | grep '"name":"start_job_semantic_analysis"'
           echo "$OUTPUT" | grep '"name":"get_research_job_validation_pack"'
@@ -61,6 +70,7 @@ jobs:
           echo "$OUTPUT" | grep '"name":"submit_llm_synthesis"'
           echo "$OUTPUT" | grep '"name":"get_research_graph"'
           echo "$OUTPUT" | grep 'No model API key is required'
+          echo "$OUTPUT" | grep 'source-aware search plans'
 
       - name: Build
         run: npm run build
