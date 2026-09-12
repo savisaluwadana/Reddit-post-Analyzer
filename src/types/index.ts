@@ -68,3 +68,54 @@ export interface DashboardInsights {
 export type TimeFilter = 'hour' | 'day' | 'week' | 'month' | 'year' | 'all';
 export type SortMode = 'opportunity' | 'score' | 'comments' | 'velocity' | 'newest';
 export type SignalFilter = 'all' | 'pain' | 'buying-intent' | 'question' | 'fast-moving' | 'discussion-heavy';
+
+export interface ResearchProject {
+  _id: string;
+  name: string;
+  description?: string;
+  subreddits: string[];
+  keywords: string[];
+  minScore: number;
+  minComments: number;
+  signalFilter: SignalFilter;
+  sortMode: SortMode;
+  createdAt: string;
+  updatedAt: string;
+}
+
+export interface ResearchProjectInput {
+  name: string;
+  description?: string;
+  subreddits: string[];
+  keywords: string[];
+  minScore: number;
+  minComments: number;
+  signalFilter: SignalFilter;
+  sortMode: SortMode;
+}
+
+export interface TrendPoint {
+  date: string;
+  trackedPosts: number;
+  avgScore: number;
+  avgComments: number;
+  totalScore: number;
+  totalComments: number;
+}
+
+export interface TrendMover {
+  redditId: string;
+  subreddit: string;
+  title?: string;
+  permalink?: string;
+  scoreDelta: number;
+  commentsDelta: number;
+  latestScore: number;
+  latestComments: number;
+}
+
+export interface TrendResponse {
+  days: number;
+  points: TrendPoint[];
+  topMovers: TrendMover[];
+}
