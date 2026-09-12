@@ -60,6 +60,12 @@ Why the application does not need an OpenAI/Anthropic model API key and how the 
 
 Read this when you are working on the semantic layer.
 
+### [Research Quality Intelligence](QUALITY_INTELLIGENCE.md)
+
+How the post-synthesis challenge layer adds cross-run pain lineage, explicit support-vs-contradiction classification, canonical competitor/entity memory, deterministic opportunity rescoring and sourced TAM/SAM/SOM ranges.
+
+Read this when you want to improve decision quality after semantic synthesis instead of simply generating more opportunities.
+
 ### [System Audit and Reliability](SYSTEM_AUDIT.md)
 
 Correctness invariants introduced during the full reliability audit, including multi-job evidence membership, state guards, story-level independence and regression tests.
@@ -86,6 +92,8 @@ USER_GUIDE
 MCP
     ↓
 AUTONOMOUS_RESEARCH
+    ↓
+QUALITY_INTELLIGENCE
 ```
 
 For someone developing the research engine:
@@ -96,6 +104,8 @@ USER_GUIDE
 DEEP_RESEARCH
     ↓
 HOST_LLM
+    ↓
+QUALITY_INTELLIGENCE
     ↓
 SYSTEM_AUDIT
 ```
@@ -122,6 +132,11 @@ Opportunity synthesis
 Competitor / pricing validation
       ↓
 reject / watch / validate / build
+      ↓
+Post-synthesis quality challenge
+      ↓
+lineage + consensus + canonical entities
++ deterministic scoring + sourced market sizing
 ```
 
 The platform itself does not require an OpenAI, Anthropic or embedding API key. The connected MCP host supplies browsing and semantic reasoning from its own session.
