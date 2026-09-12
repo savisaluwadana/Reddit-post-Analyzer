@@ -28,6 +28,9 @@ jobs:
       - name: Lint
         run: npm run lint
 
+      - name: Unit tests
+        run: npm test
+
       - name: Check server syntax
         run: |
           node --check server/index.js
@@ -38,6 +41,8 @@ jobs:
           node --check server/researchJobRoutes.js
           node --check server/researchSearchPlanner.js
           node --check server/researchSearchRoutes.js
+          node --check server/reliabilityCore.js
+          node --check server/reliabilityRoutes.js
           node --check mcp/hostTools.js
           node --check mcp/searchTools.js
           node --check mcp/server.js
