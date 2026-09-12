@@ -203,3 +203,40 @@ export interface PainScanResult {
   topPersonas: Array<{ persona: string; mentions: number }>;
   errors: string[];
 }
+
+export interface PersistedPainScan {
+  _id: string;
+  name: string;
+  generatedAt: string;
+  subreddits: string[];
+  postsScanned: number;
+  commentsScanned: number;
+  painPosts: number;
+  painComments: number;
+  highIntentEvidence: number;
+  workaroundEvidence: number;
+  clusters: PainCluster[];
+  categories: PainCategoryBreakdown[];
+  topPersonas: Array<{ persona: string; mentions: number }>;
+  createdAt: string;
+}
+
+export type PainTrendStatus = 'new' | 'rising' | 'persistent' | 'falling';
+
+export interface PainTrendDelta {
+  id: string;
+  label: string;
+  category: PainCategory;
+  currentScore: number;
+  previousScore: number;
+  delta: number;
+  currentConfidence: number;
+  commercialIntent: number;
+  recurrence: number;
+  status: PainTrendStatus;
+}
+
+export interface PainHistoryResponse {
+  scans: PersistedPainScan[];
+  comparison: PainTrendDelta[];
+}
