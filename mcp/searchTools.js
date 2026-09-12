@@ -75,6 +75,19 @@ export const researchSearchTools = [
       type: 'object', additionalProperties: false, required: ['job_id'], properties: { job_id: { type: 'string' } },
     },
   },
+  {
+    name: 'complete_research_job_without_opportunities',
+    description: 'Complete a research job whose finished semantic synthesis generated zero opportunities. This is a valid negative research outcome and avoids inventing a validation item just to satisfy a non-empty schema.',
+    inputSchema: {
+      type: 'object',
+      additionalProperties: false,
+      required: ['job_id'],
+      properties: {
+        job_id: { type: 'string' },
+        result_summary: { type: 'string', description: 'Optional concise explanation of why no opportunity survived synthesis/validation.' },
+      },
+    },
+  },
 ];
 
 export async function callResearchSearchTool(name, args, requestJson) {
@@ -110,7 +123,7 @@ export async function callResearchSearchTool(name, args, requestJson) {
             'Explicitly search for contradictory/positive evidence, quantified impact, strong commercial behavior, and independent sources before synthesis.',
             'Repeat search/deep-scrape passes until the evidence-quality gate is ready or the research pass cap is reached.',
             'Then call start_job_semantic_analysis and complete the host semantic workflow.',
-            'Finally validate competitors, pricing, switching barriers, and substitutes before submit_opportunity_validation.',
+            'Finally validate competitors, pricing, switching barriers, and substitutes before submit_opportunity_validation. If synthesis produced zero opportunities, use complete_research_job_without_opportunities instead.',
           ],
         },
       },
@@ -187,6 +200,20 @@ export async function callResearchSearchTool(name, args, requestJson) {
 
   if (name === 'get_research_search_memory') {
     return { handled: true, value: await requestJson(`/api/research-search/jobs/${jobId}/memory`) };
+  }
+
+  if (name === 'complete_research_job_without_opportunities') {
+    const pack = await requestJson(`/api/research-jobs/${jobId}/validation-pack`);
+    if ((pack.opportunities || []).length !== 0) {
+      throw new Error(`This job has ${(pack.opportunities || []).length} synthesized opportunities; validate them with submit_opportunity_validation instead.`);
+    }
+    return {
+      handled: true,
+      value: await requestJson(`/api/research-jobs/${jobId}/validation`, {
+        method: 'POST',
+        body: JSON.stringify({ validations: [], resultSummary: args.result_summary || 'Semantic synthesis produced no opportunities worth validating.' }),
+      }),
+    };
   }
 
   return { handled: false, value: null };
