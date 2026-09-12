@@ -77,7 +77,6 @@ function scoreDimension(text: string, terms: string[], multiplier: number) {
 
 function evidenceFromText(
   sourceType: 'post' | 'comment',
-  _source: RedditPost | RedditComment,
   postId: string,
   subreddit: string,
   author: string,
@@ -197,10 +196,10 @@ export function buildPainScan(posts: RedditPost[], comments: RedditComment[] = [
   const evidence: PainEvidence[] = [];
   posts.forEach((post) => {
     const text = `${post.title}\n${post.selftext ?? ''}`;
-    evidence.push(...evidenceFromText('post', post, post.id, post.subreddit, post.author, text, `https://reddit.com${post.permalink}`, post.score));
+    evidence.push(...evidenceFromText('post', post.id, post.subreddit, post.author, text, `https://reddit.com${post.permalink}`, post.score));
   });
   comments.forEach((comment) => {
-    evidence.push(...evidenceFromText('comment', comment, comment.postId, comment.subreddit, comment.author, comment.body, comment.permalink ? `https://reddit.com${comment.permalink}` : undefined, comment.score));
+    evidence.push(...evidenceFromText('comment', comment.postId, comment.subreddit, comment.author, comment.body, comment.permalink ? `https://reddit.com${comment.permalink}` : undefined, comment.score));
   });
 
   const uniqueSourceEvidence = new Map<string, PainEvidence>();
