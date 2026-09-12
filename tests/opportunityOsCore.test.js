@@ -24,6 +24,12 @@ test('a presale experiment is not a paid signal without an actual commitment', (
   assert.equal(signal.paidSignal, false);
 });
 
+test('a supports label with no observed data is capped', () => {
+  const signal = calculateExperimentSignal({ type: 'interview', status: 'complete', verdict: 'supports', result: {} });
+  assert.ok(signal.score <= 45);
+  assert.equal(signal.paidSignal, false);
+});
+
 test('actual money or paid commitments create a commercial signal', () => {
   const signal = calculateExperimentSignal({
     type: 'paid-pilot',
@@ -43,6 +49,17 @@ test('high research alone never produces a build recommendation', () => {
   });
   assert.equal(decision.recommendation, 'validate');
   assert.equal(decision.validation.completedExperiments, 0);
+});
+
+test('prior reject verdict stays stopped until fresh real-world validation exists', () => {
+  const decision = calculateOpportunityDecision({
+    researchScore: 95,
+    marketValidationVerdict: 'reject',
+    founderFit: { skillFit: 95, distributionFit: 95, capitalFit: 95, timeToMarketFit: 95, operatingFit: 95 },
+    experiments: [],
+  });
+  assert.equal(decision.recommendation, 'stop');
+  assert.ok(decision.decisionScore <= 45);
 });
 
 test('two strong experiments without paid proof still do not produce build', () => {
