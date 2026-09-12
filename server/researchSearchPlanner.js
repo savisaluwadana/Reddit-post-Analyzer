@@ -13,6 +13,52 @@ const SOURCE_PROFILES = {
   web: { label: 'Public web', depth: 'page', strengths: ['discovery', 'case studies', 'competitor context'] },
 };
 
+const SOURCE_TRAVERSAL = {
+  reddit: [
+    'Capture the original post, edits, and OP follow-up comments that materially change the problem statement.',
+    'Inspect multiple relevant comment branches instead of only the top comment; preserve parent-child context for useful replies.',
+    'Capture disagreements, alternative recommendations, and successful resolutions as separate evidence claims.',
+  ],
+  github: [
+    'Capture the issue/discussion body, reproduction/workflow context, maintainer responses, labels/status, and final resolution when public.',
+    'Follow directly linked issues, discussions, PRs, or release notes only when they materially explain the failure or resolution.',
+    'Distinguish one reporter repeated across comments from independent users confirming the same problem.',
+  ],
+  support: [
+    'Capture the original support question, troubleshooting replies, accepted solution, vendor response, and whether the issue remained unresolved or recurred.',
+    'Follow linked public support threads when they demonstrate recurrence rather than collecting duplicate documentation text.',
+  ],
+  forum: [
+    'Traverse relevant pagination and quoted/nested replies while preserving which participant made each claim.',
+    'Prefer separate practitioner experiences over many replies debating the same single anecdote.',
+  ],
+  community: [
+    'Capture root context plus distinct practitioner replies, especially concrete workflow descriptions and alternative recommendations.',
+    'Separate firsthand operator/customer evidence from second-hand summaries.',
+  ],
+  review: [
+    'Sample independent reviews across dates and ratings; deliberately include both negative and positive experiences.',
+    'Capture concrete feature/workflow complaints, price/value claims, switching language, and vendor responses when public.',
+    'Do not treat duplicated syndicated reviews as independent evidence.',
+  ],
+  'app-store': [
+    'Sample multiple independent reviews across versions/dates and ratings rather than many near-identical complaints from one release window.',
+    'Capture regressions, paid-feature complaints, cancellation/refund language, and developer replies when public.',
+  ],
+  social: [
+    'Capture the original public post plus materially relevant replies/quote-post context without expanding into unrelated conversation.',
+    'Prefer concrete first-person usage claims over viral reposts or commentary without direct experience.',
+  ],
+  marketplace: [
+    'Sample multiple independent buyer/seller experiences and preserve product/category context.',
+    'Capture fulfillment, pricing, quality, trust, and workaround claims separately when they represent different pains.',
+  ],
+  web: [
+    'Read the relevant page section in context and follow directly cited public sources when they contain the original first-hand evidence.',
+    'Treat summaries/listicles as discovery leads, not independent proof, unless they contain attributable firsthand workflow evidence.',
+  ],
+};
+
 const COMMERCIAL_PATTERNS = [
   /willing to pay/i, /would pay/i, /budget(?:ed)? for/i, /looking for (?:an )?alternative/i,
   /switch(?:ed|ing)? (?:from|to)/i, /cancel(?:led|ing)?/i, /refund/i, /too expensive/i,
@@ -54,6 +100,12 @@ function jaccard(left, right) {
   return intersection / (left.size + right.size - intersection);
 }
 
+function minHashBuckets(shingles, fallback) {
+  if (!shingles.size) return [crypto.createHash('sha1').update(fallback).digest('hex').slice(0, 6)];
+  const hashes = [...shingles].map((value) => crypto.createHash('sha1').update(value).digest('hex')).sort();
+  return hashes.slice(0, 3).map((value, index) => `${index}:${value.slice(0, 6)}`);
+}
+
 function hostname(url) {
   try { return new URL(url).hostname.replace(/^www\./, '').toLowerCase(); } catch { return ''; }
 }
@@ -81,18 +133,26 @@ export function analyzeEvidenceIndependence(items = []) {
   const buckets = new Map();
 
   entries.forEach((entry) => {
-    const firstWords = [...entry.shingles].slice(0, 3).join('|');
-    const bucketKey = crypto.createHash('sha1').update(firstWords || entry.identity).digest('hex').slice(0, 4);
-    const candidates = buckets.get(bucketKey) || [];
+    const bucketKeys = minHashBuckets(entry.shingles, entry.identity);
+    const candidateMap = new Map();
+    bucketKeys.forEach((key) => {
+      (buckets.get(key) || []).forEach((candidate) => candidateMap.set(candidate.id, candidate));
+    });
     let best = null;
     let bestSimilarity = 0;
-    for (const candidate of candidates) {
+    for (const candidate of candidateMap.values()) {
       const similarity = jaccard(entry.shingles, candidate.shingles);
       if (similarity > bestSimilarity) { best = candidate; bestSimilarity = similarity; }
     }
-    if (best && bestSimilarity >= 0.72) duplicateOf.set(entry.id, { id: best.id, similarity: Number(bestSimilarity.toFixed(3)) });
-    else candidates.push(entry);
-    buckets.set(bucketKey, candidates);
+    if (best && bestSimilarity >= 0.72) {
+      duplicateOf.set(entry.id, { id: best.id, similarity: Number(bestSimilarity.toFixed(3)) });
+      return;
+    }
+    bucketKeys.forEach((key) => {
+      const candidates = buckets.get(key) || [];
+      candidates.push(entry);
+      buckets.set(key, candidates);
+    });
   });
 
   const identityGroups = new Map();
@@ -131,7 +191,7 @@ function mission(id, objective, queryTemplates, sourceKinds, depth = 'page', pri
   return { id, objective, priority, queryTemplates, sourceKinds, depth };
 }
 
-export function buildResearchSearchPlan(job, coverage = null) {
+export function buildResearchSearchPlan(job, coverage = null, discoveredEntities = []) {
   const topic = String(job.topic || '').trim();
   const audience = String(job.audience || '').trim();
   const context = audience ? `${topic} ${audience}` : topic;
@@ -171,6 +231,21 @@ export function buildResearchSearchPlan(job, coverage = null) {
     missions.unshift(mission('user-angles', 'Execute user-provided research angles before generic expansion.', requestedAngles.map((angle) => `${context} ${angle}`), preferred.slice(0, 6), 'thread', 'high'));
   }
 
+  const entityList = [...new Set((discoveredEntities || []).map((item) => String(item).trim()).filter(Boolean))].slice(0, 8);
+  entityList.forEach((entity, index) => {
+    missions.push(mission(
+      `entity-branch-${index + 1}`,
+      `Investigate newly discovered product/company/tool ${entity} as a possible incumbent, substitute, or source of recurring pain.`,
+      [
+        `"${entity}" complaints`, `"${entity}" pricing`, `"${entity}" alternative`, `"${entity}" switching`,
+        `"${entity}" too expensive`, `"${entity}" review problem`,
+      ],
+      ['review', 'forum', 'support', 'community', 'reddit', 'web'],
+      'thread',
+      'medium',
+    ));
+  });
+
   const coverageGaps = coverage?.gaps || job.gaps || [];
   coverageGaps.slice(0, 6).forEach((gap, index) => {
     missions.push(mission(
@@ -187,8 +262,8 @@ export function buildResearchSearchPlan(job, coverage = null) {
     topic,
     audience,
     generatedAt: new Date().toISOString(),
-    strategy: 'breadth → depth → contradiction → commercial validation → gap fill',
-    missions: missions.slice(0, 14),
+    strategy: 'breadth → depth → entity branching → contradiction → commercial validation → gap fill',
+    missions: missions.slice(0, 22),
     sourceProfiles: preferred.map((kind) => ({ kind, ...(SOURCE_PROFILES[kind] || { label: kind, depth: 'page', strengths: [] }) })),
     queryRules: [
       'Run several materially different queries per mission; do not stop after the first search result page.',
@@ -215,15 +290,14 @@ export function buildDeepScrapePlan(input = {}) {
       'Capture the root post/review/issue plus enough surrounding context to understand the workflow and claim.',
       'Traverse visible replies/comments and nested branches that contain pain, workarounds, alternatives, commercial signals, disagreement, or resolution details.',
       'Follow pagination/load-more controls when they expose additional relevant conversation; do not repeatedly scrape duplicate pages.',
-      'For issue/support threads, capture resolution/outcome and maintainer/vendor responses when present.',
-      'For reviews, sample multiple independent reviewers across ratings instead of copying one review page wholesale.',
+      ...(SOURCE_TRAVERSAL[sourceKind] || SOURCE_TRAVERSAL.web),
       'Follow directly linked public evidence when it materially explains the problem, workaround, or competing solution.',
       'Preserve canonical URL, source, community/product, author when public, publication date, and parent/thread context in metadata.',
     ],
     extraction: {
       oneEvidenceItemPerClaim: true,
       preserveContext: true,
-      suggestedMetadata: ['first_hand', 'thread_id', 'parent_id', 'depth', 'root_url', 'scrape_method', 'claim_type', 'resolution', 'rating'],
+      suggestedMetadata: ['first_hand', 'thread_id', 'parent_id', 'depth', 'root_url', 'scrape_method', 'claim_type', 'resolution', 'rating', 'version', 'status'],
       claimTypes: ['pain', 'workaround', 'commercial-intent', 'alternative', 'contradiction', 'resolution', 'pricing'],
     },
     stopConditions: [
