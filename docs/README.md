@@ -66,6 +66,12 @@ How the post-synthesis challenge layer adds cross-run pain lineage, explicit sup
 
 Read this when you want to improve decision quality after semantic synthesis instead of simply generating more opportunities.
 
+### [Founder / Product Opportunity OS](OPPORTUNITY_OS.md)
+
+How validated opportunities become durable execution workspaces with ICP/buyer strategy, founder-team fit, validation experiments, real-world outcome scoring, MVP specifications and first-customer GTM plans.
+
+Read this when you want to move from "interesting opportunity" to an evidence-backed build/validate/watch/stop decision.
+
 ### [System Audit and Reliability](SYSTEM_AUDIT.md)
 
 Correctness invariants introduced during the full reliability audit, including multi-job evidence membership, state guards, story-level independence and regression tests.
@@ -94,6 +100,8 @@ MCP
 AUTONOMOUS_RESEARCH
     ↓
 QUALITY_INTELLIGENCE
+    ↓
+OPPORTUNITY_OS
 ```
 
 For someone developing the research engine:
@@ -106,6 +114,8 @@ DEEP_RESEARCH
 HOST_LLM
     ↓
 QUALITY_INTELLIGENCE
+    ↓
+OPPORTUNITY_OS
     ↓
 SYSTEM_AUDIT
 ```
@@ -131,12 +141,20 @@ Opportunity synthesis
       ↓
 Competitor / pricing validation
       ↓
-reject / watch / validate / build
-      ↓
 Post-synthesis quality challenge
       ↓
 lineage + consensus + canonical entities
 + deterministic scoring + sourced market sizing
+      ↓
+Opportunity OS workspace
+      ↓
+strategy + founder/team fit
+      ↓
+real validation experiments
+      ↓
+Build / Validate / Watch / Stop
+      ↓
+MVP specification + first-customer GTM
 ```
 
 The platform itself does not require an OpenAI, Anthropic or embedding API key. The connected MCP host supplies browsing and semantic reasoning from its own session.
