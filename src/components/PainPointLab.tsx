@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useState } from 'react';
+import { useMemo, useState } from 'react';
 import type { PainCategory, PainScanResult, RedditPost } from '../types';
 import { buildPainScan, rankPostsForPainScan } from '../utils/painIntelligence';
 import { fetchCommentsForPosts } from '../utils/threadApi';
@@ -25,7 +25,7 @@ const CATEGORY_LABELS: Record<PainCategory, string> = {
 
 function reportText(report: PainScanResult) {
   const lines = [
-    `Pain Point Intelligence Report`,
+    'Pain Point Intelligence Report',
     `Posts scanned: ${report.postsScanned} | Comments scanned: ${report.commentsScanned}`,
     `Pain posts: ${report.painPosts} | Pain comments: ${report.painComments}`,
     '',
@@ -44,7 +44,7 @@ function reportText(report: PainScanResult) {
 }
 
 export function PainPointLab({ posts }: PainPointLabProps) {
-  const [scan, setScan] = useState<PainScanResult | null>(null);
+  const [scanState, setScanState] = useState<{ postsKey: string; result: PainScanResult } | null>(null);
   const [isScanning, setIsScanning] = useState(false);
   const [completed, setCompleted] = useState(0);
   const [scanTotal, setScanTotal] = useState(0);
@@ -52,14 +52,10 @@ export function PainPointLab({ posts }: PainPointLabProps) {
   const [commentsPerThread, setCommentsPerThread] = useState(35);
   const [category, setCategory] = useState<'all' | PainCategory>('all');
 
+  const postsKey = useMemo(() => posts.map((post) => post.id).join('|'), [posts]);
   const preview = useMemo(() => buildPainScan(posts), [posts]);
+  const scan = scanState?.postsKey === postsKey ? scanState.result : null;
   const report = scan ?? preview;
-
-  useEffect(() => {
-    setScan(null);
-    setCompleted(0);
-    setScanTotal(0);
-  }, [posts]);
 
   const clusters = useMemo(() => {
     return report.clusters.filter((cluster) => category === 'all' || cluster.category === category).slice(0, 14);
@@ -82,7 +78,7 @@ export function PainPointLab({ posts }: PainPointLabProps) {
           setScanTotal(total);
         },
       );
-      setScan(buildPainScan(posts, comments, errors));
+      setScanState({ postsKey, result: buildPainScan(posts, comments, errors) });
     } finally {
       setIsScanning(false);
     }
