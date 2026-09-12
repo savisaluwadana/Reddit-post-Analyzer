@@ -82,7 +82,7 @@ async function getMemory(jobId) {
 }
 
 function memoryAwarePlan(job, memory) {
-  const plan = buildResearchSearchPlan(job, job.coverage || null);
+  const plan = buildResearchSearchPlan(job, job.coverage || null, memory?.discoveredEntities || []);
   const alreadyRun = new Set((memory?.queries || []).map((item) => item.query.toLowerCase()));
   return {
     ...plan,
