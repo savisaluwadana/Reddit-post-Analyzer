@@ -28,5 +28,10 @@ jobs:
       - name: Lint
         run: npm run lint
 
+      - name: Check server syntax
+        run: |
+          node --check server/index.js
+          node --check server/painScanRoutes.js
+
       - name: Build
         run: npm run build
