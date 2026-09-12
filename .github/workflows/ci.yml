@@ -46,9 +46,12 @@ jobs:
           node --check server/integrityGuardRoutes.js
           node --check server/qualityIntelligenceCore.js
           node --check server/qualityIntelligenceRoutes.js
+          node --check server/opportunityOsCore.js
+          node --check server/opportunityOsRoutes.js
           node --check mcp/hostTools.js
           node --check mcp/searchTools.js
           node --check mcp/qualityTools.js
+          node --check mcp/opportunityTools.js
           node --check mcp/server.js
 
       - name: MCP stdio smoke test
@@ -85,6 +88,13 @@ jobs:
           echo "$OUTPUT" | grep '"name":"submit_cluster_consensus"'
           echo "$OUTPUT" | grep '"name":"get_market_sizing_pack"'
           echo "$OUTPUT" | grep '"name":"submit_market_sizing_assessment"'
+          echo "$OUTPUT" | grep '"name":"create_opportunity_workspace"'
+          echo "$OUTPUT" | grep '"name":"submit_opportunity_strategy"'
+          echo "$OUTPUT" | grep '"name":"create_validation_experiment"'
+          echo "$OUTPUT" | grep '"name":"record_validation_result"'
+          echo "$OUTPUT" | grep '"name":"get_opportunity_execution_pack"'
+          echo "$OUTPUT" | grep '"name":"submit_build_spec"'
+          echo "$OUTPUT" | grep '"name":"submit_gtm_plan"'
           echo "$OUTPUT" | grep 'No model API key is required'
           echo "$OUTPUT" | grep 'source-aware search plans'
           echo "$OUTPUT" | grep 'sourced market sizing'
