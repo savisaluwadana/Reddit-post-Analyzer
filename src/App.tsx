@@ -20,6 +20,7 @@ import type {
   TrendResponse,
 } from './types';
 import { analyzePosts, calculatePostIntelligence } from './utils/analytics';
+import { formatLocalDateInput, parseLocalDateInput } from './utils/date';
 import { savePostsToDatabase } from './utils/postStorageApi';
 import {
   createResearchProject,
@@ -34,8 +35,8 @@ function App() {
 
   const defaultFrom = new Date();
   defaultFrom.setDate(defaultFrom.getDate() - 7);
-  const [fromDate, setFromDate] = useState(defaultFrom.toISOString().split('T')[0]);
-  const [toDate, setToDate] = useState(new Date().toISOString().split('T')[0]);
+  const [fromDate, setFromDate] = useState(formatLocalDateInput(defaultFrom));
+  const [toDate, setToDate] = useState(formatLocalDateInput(new Date()));
   const [limit, setLimit] = useState<number>(25);
 
   const [posts, setPosts] = useState<RedditPost[]>([]);
@@ -131,8 +132,8 @@ function App() {
     setSaveMessage('');
 
     try {
-      const from = new Date(fromDate);
-      const to = new Date(toDate);
+      const from = parseLocalDateInput(fromDate);
+      const to = parseLocalDateInput(toDate, true);
       const { posts: fetchedPosts, errors: fetchErrors } = await fetchAllPosts(subreddits, limit, from, to);
 
       setPosts(fetchedPosts);
