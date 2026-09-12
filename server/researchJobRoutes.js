@@ -47,7 +47,12 @@ const researchJobSchema = new mongoose.Schema({
   audience: { type: String, default: '', maxlength: 500 },
   status: { type: String, enum: [...JOB_STATUSES], default: 'queued', index: true },
   priority: { type: Number, default: 50, min: 0, max: 100, index: true },
-  batchId: { type: String, default: '', unique: true, sparse: true, index: true },
+  batchId: {
+    type: String,
+    default: () => `research-job:${new mongoose.Types.ObjectId()}`,
+    unique: true,
+    index: true,
+  },
   preferredSourceKinds: { type: [String], default: [] },
   searchAngles: { type: [String], default: [] },
   claimedBy: { type: String, default: '', maxlength: 120 },
@@ -133,16 +138,7 @@ function normalizeValidation(item) {
 
 function serializeJob(job) {
   const raw = job?.toObject ? job.toObject() : job;
-  return {
-    ...raw,
-    _id: String(raw._id),
-    hostRunId: raw.hostRunId ? String(raw.hostRunId) : '',
-  };
-}
-
-function ratio(value, target) {
-  if (!target) return 1;
-  return Math.min(1, value / target);
+  return { ...raw, _id: String(raw._id), hostRunId: raw.hostRunId ? String(raw.hostRunId) : '' };
 }
 
 function concentrationScore(value, maxAllowed) {
@@ -155,95 +151,38 @@ function buildSearchBriefs(metrics, targets, job) {
   const briefs = [];
   const kindCounts = new Map(metrics.byKind.map((item) => [item.sourceKind, item.count]));
   const missingKinds = SOURCE_GAP_ORDER.filter((kind) => !kindCounts.has(kind));
+
   if (metrics.totalEvidence < targets.minEvidence) {
-    briefs.push({
-      gap: 'evidence-volume',
-      priority: 'high',
-      goal: `Collect at least ${targets.minEvidence - metrics.totalEvidence} more concrete first-hand evidence items.`,
-      queryAngles: ['recurring workflow failure', 'manual workaround', 'cost or time impact', 'looking for alternative', 'switching or cancellation'],
-      preferredSourceKinds: missingKinds.slice(0, 4),
-    });
+    briefs.push({ gap: 'evidence-volume', priority: 'high', goal: `Collect at least ${targets.minEvidence - metrics.totalEvidence} more concrete first-hand evidence items.`, queryAngles: ['recurring workflow failure', 'manual workaround', 'cost or time impact', 'looking for alternative', 'switching or cancellation'], preferredSourceKinds: missingKinds.slice(0, 4) });
   }
   if (metrics.sourceKindCount < targets.minSourceKinds) {
-    briefs.push({
-      gap: 'source-type-diversity',
-      priority: 'high',
-      goal: `Add ${targets.minSourceKinds - metrics.sourceKindCount} additional source types so the conclusion is not community-specific.`,
-      queryAngles: ['reviews', 'specialist forums', 'support discussions', 'public social posts', 'issue trackers'],
-      preferredSourceKinds: missingKinds.slice(0, 5),
-    });
+    briefs.push({ gap: 'source-type-diversity', priority: 'high', goal: `Add ${targets.minSourceKinds - metrics.sourceKindCount} additional source types so the conclusion is not community-specific.`, queryAngles: ['reviews', 'specialist forums', 'support discussions', 'public social posts', 'issue trackers'], preferredSourceKinds: missingKinds.slice(0, 5) });
   }
   if (metrics.namedSourceCount < targets.minNamedSources) {
-    briefs.push({
-      gap: 'independent-sources',
-      priority: 'high',
-      goal: `Find evidence from at least ${targets.minNamedSources - metrics.namedSourceCount} more independent named sources.`,
-      queryAngles: [`${job.topic} complaints`, `${job.topic} alternatives`, `${job.topic} reviews`],
-      preferredSourceKinds: missingKinds.slice(0, 4),
-    });
+    briefs.push({ gap: 'independent-sources', priority: 'high', goal: `Find evidence from at least ${targets.minNamedSources - metrics.namedSourceCount} more independent named sources.`, queryAngles: [`${job.topic} complaints`, `${job.topic} alternatives`, `${job.topic} reviews`], preferredSourceKinds: missingKinds.slice(0, 4) });
   }
   if (metrics.dominantSourceShare > targets.maxSourceConcentration) {
-    briefs.push({
-      gap: 'source-concentration',
-      priority: 'high',
-      goal: `Reduce dependence on ${metrics.dominantSourceName || 'the dominant source'}; it currently contributes ${Math.round(metrics.dominantSourceShare * 100)}% of evidence.`,
-      queryAngles: ['same pain on a different platform', 'independent review', 'community discussion', 'support complaint'],
-      preferredSourceKinds: missingKinds.slice(0, 5),
-    });
+    briefs.push({ gap: 'source-concentration', priority: 'high', goal: `Reduce dependence on ${metrics.dominantSourceName || 'the dominant source'}; it currently contributes ${Math.round(metrics.dominantSourceShare * 100)}% of evidence.`, queryAngles: ['same pain on a different platform', 'independent review', 'community discussion', 'support complaint'], preferredSourceKinds: missingKinds.slice(0, 5) });
   }
   if (metrics.urlCoverage < targets.minUrlCoverage) {
-    briefs.push({
-      gap: 'provenance',
-      priority: 'medium',
-      goal: 'Prefer canonical public URLs for new evidence so every conclusion can be audited.',
-      queryAngles: ['canonical thread', 'original review', 'original issue or discussion'],
-      preferredSourceKinds: [],
-    });
+    briefs.push({ gap: 'provenance', priority: 'medium', goal: 'Prefer canonical public URLs for new evidence so every conclusion can be audited.', queryAngles: ['canonical thread', 'original review', 'original issue or discussion'], preferredSourceKinds: [] });
   }
   if (metrics.recentCoverage < targets.minRecentCoverage) {
-    briefs.push({
-      gap: 'recency',
-      priority: 'medium',
-      goal: `Increase evidence published within the last ${targets.recentDays} days.`,
-      queryAngles: [`${job.topic} recent complaints`, `${job.topic} 2026 problems`, `${job.topic} current alternatives`],
-      preferredSourceKinds: missingKinds.slice(0, 4),
-    });
+    briefs.push({ gap: 'recency', priority: 'medium', goal: `Increase evidence published within the last ${targets.recentDays} days.`, queryAngles: [`${job.topic} recent complaints`, `${job.topic} 2026 problems`, `${job.topic} current alternatives`], preferredSourceKinds: missingKinds.slice(0, 4) });
   }
-  if (metrics.firstHandCoverage !== null && metrics.firstHandCoverage < targets.minFirstHandCoverage) {
-    briefs.push({
-      gap: 'first-hand-evidence',
-      priority: 'high',
-      goal: 'Collect more direct practitioner/customer experiences rather than summaries or marketing pages. Tag new items with metadata.first_hand=true.',
-      queryAngles: ['I use', 'we spend', 'our workflow', 'I switched', 'I cancelled', 'we built a spreadsheet'],
-      preferredSourceKinds: ['review', 'forum', 'support', 'community', 'reddit'],
-    });
+  if (metrics.firstHandTagged === 0) {
+    briefs.push({ gap: 'first-hand-tagging', priority: 'medium', goal: 'Tag new evidence with metadata.first_hand=true/false so first-hand coverage is measurable.', queryAngles: ['I use', 'we spend', 'our workflow', 'I switched', 'I cancelled'], preferredSourceKinds: ['review', 'forum', 'support', 'community', 'reddit'] });
+  } else if (metrics.firstHandCoverage < targets.minFirstHandCoverage) {
+    briefs.push({ gap: 'first-hand-evidence', priority: 'high', goal: 'Collect more direct practitioner/customer experiences rather than summaries or marketing pages.', queryAngles: ['I use', 'we spend', 'our workflow', 'I switched', 'I cancelled', 'we built a spreadsheet'], preferredSourceKinds: ['review', 'forum', 'support', 'community', 'reddit'] });
   }
   if (metrics.commercialSignals < targets.minCommercialSignals) {
-    briefs.push({
-      gap: 'commercial-intent',
-      priority: 'medium',
-      goal: `Find at least ${targets.minCommercialSignals - metrics.commercialSignals} more buying, switching, budget, refund, or alternative-seeking signals.`,
-      queryAngles: ['willing to pay', 'looking for alternative', 'too expensive', 'cancelled subscription', 'switching from', 'budget for'],
-      preferredSourceKinds: ['review', 'forum', 'support', 'community', 'social'],
-    });
+    briefs.push({ gap: 'commercial-intent', priority: 'medium', goal: `Find at least ${targets.minCommercialSignals - metrics.commercialSignals} more buying, switching, budget, refund, or alternative-seeking signals.`, queryAngles: ['willing to pay', 'looking for alternative', 'too expensive', 'cancelled subscription', 'switching from', 'budget for'], preferredSourceKinds: ['review', 'forum', 'support', 'community', 'social'] });
   }
   if (metrics.workaroundSignals < targets.minWorkaroundSignals) {
-    briefs.push({
-      gap: 'workaround-evidence',
-      priority: 'medium',
-      goal: `Find at least ${targets.minWorkaroundSignals - metrics.workaroundSignals} more descriptions of manual or multi-tool workarounds.`,
-      queryAngles: ['spreadsheet workaround', 'manual process', 'copy paste', 'multiple tools', 'homegrown script', 'email workflow'],
-      preferredSourceKinds: ['forum', 'community', 'reddit', 'support', 'github'],
-    });
+    briefs.push({ gap: 'workaround-evidence', priority: 'medium', goal: `Find at least ${targets.minWorkaroundSignals - metrics.workaroundSignals} more descriptions of manual or multi-tool workarounds.`, queryAngles: ['spreadsheet workaround', 'manual process', 'copy paste', 'multiple tools', 'homegrown script', 'email workflow'], preferredSourceKinds: ['forum', 'community', 'reddit', 'support', 'github'] });
   }
   if (metrics.hostRunLinked && metrics.personaCount < targets.minPersonas) {
-    briefs.push({
-      gap: 'persona-breadth',
-      priority: 'medium',
-      goal: `Validate whether the pain affects at least ${targets.minPersonas} distinct personas or a clearly valuable narrow segment.`,
-      queryAngles: ['role-specific workflow', 'buyer vs operator pain', 'small business vs enterprise', 'customer vs administrator'],
-      preferredSourceKinds: missingKinds.slice(0, 4),
-    });
+    briefs.push({ gap: 'persona-breadth', priority: 'medium', goal: `Validate whether the pain affects at least ${targets.minPersonas} distinct personas or a clearly valuable narrow segment.`, queryAngles: ['role-specific workflow', 'buyer vs operator pain', 'small business vs enterprise', 'customer vs administrator'], preferredSourceKinds: missingKinds.slice(0, 4) });
   }
   return briefs.slice(0, 10);
 }
@@ -278,17 +217,9 @@ async function calculateCoverage(job) {
   const dominantSourceShare = totalEvidence ? (dominant?.count || 0) / totalEvidence : 0;
 
   const report = analyzeGeneralEvidence(evidence.map((item) => ({
-    id: String(item._id),
-    sourceKind: item.sourceKind,
-    sourceName: item.sourceName,
-    community: item.community,
-    author: item.author,
-    title: item.title,
-    text: item.text,
-    url: item.sourceUrl,
-    engagementScore: item.engagementScore,
-    publishedAt: item.publishedAt,
-    tags: item.tags,
+    id: String(item._id), sourceKind: item.sourceKind, sourceName: item.sourceName, community: item.community,
+    author: item.author, title: item.title, text: item.text, url: item.sourceUrl,
+    engagementScore: item.engagementScore, publishedAt: item.publishedAt, tags: item.tags,
   })));
 
   let annotationCount = 0;
@@ -335,23 +266,13 @@ async function calculateCoverage(job) {
     firstHandScore * 0.08 +
     score(metrics.commercialSignals, targets.minCommercialSignals) * 0.06
   );
-
   const semanticScore = hostRunLinked
     ? Math.round(collectionScore * 0.78 + score(metrics.annotationCoverage, 0.9) * 0.12 + score(metrics.personaCount, targets.minPersonas) * 0.10)
     : collectionScore;
-  const searchBriefs = buildSearchBriefs(metrics, targets, job);
-  const highPriorityGaps = searchBriefs.filter((item) => item.priority === 'high');
-  const readyForSemantic = collectionScore >= targets.collectionScore && highPriorityGaps.length === 0;
+  const gaps = buildSearchBriefs(metrics, targets, job);
+  const readyForSemantic = collectionScore >= targets.collectionScore && gaps.every((item) => item.priority !== 'high');
 
-  return {
-    generatedAt: new Date().toISOString(),
-    collectionScore,
-    semanticScore,
-    readyForSemantic,
-    targets,
-    metrics,
-    gaps: searchBriefs,
-  };
+  return { generatedAt: new Date().toISOString(), collectionScore, semanticScore, readyForSemantic, targets, metrics, gaps };
 }
 
 function executionProtocol(job, coverage = null) {
@@ -389,9 +310,8 @@ export function createResearchJobRouter() {
     try {
       const topic = safeText(req.body?.topic, 700);
       if (!topic) return res.status(400).json({ message: 'Research topic is required' });
-      const name = safeText(req.body?.name, 160) || topic.slice(0, 120);
       const job = await ResearchJobModel.create({
-        name,
+        name: safeText(req.body?.name, 160) || topic.slice(0, 120),
         topic,
         audience: safeText(req.body?.audience, 500),
         priority: clamp(req.body?.priority, 0, 100, 50),
@@ -400,8 +320,6 @@ export function createResearchJobRouter() {
         maxPasses: clamp(req.body?.maxPasses ?? req.body?.max_passes, 1, 8, 3),
         coverageTarget: normalizedTargets(req.body?.coverageTarget ?? req.body?.coverage_target ?? {}),
       });
-      job.batchId = `research-job:${job._id}`;
-      await job.save();
       return res.status(201).json({ job: serializeJob(job), executionProtocol: executionProtocol(job) });
     } catch (error) {
       console.error('Failed to create research job:', error);
@@ -415,20 +333,8 @@ export function createResearchJobRouter() {
       const leaseMinutes = clamp(req.body?.leaseMinutes ?? req.body?.lease_minutes, 5, 120, 30);
       const now = new Date();
       const job = await ResearchJobModel.findOneAndUpdate(
-        {
-          $or: [
-            { status: 'queued' },
-            { status: { $in: ACTIVE_STATUSES }, claimExpiresAt: { $lte: now } },
-          ],
-        },
-        {
-          $set: {
-            status: 'claimed',
-            claimedBy: harness,
-            claimExpiresAt: new Date(now.getTime() + leaseMinutes * 60 * 1000),
-            lastHeartbeatAt: now,
-          },
-        },
+        { $or: [{ status: 'queued' }, { status: { $in: ACTIVE_STATUSES }, claimExpiresAt: { $lte: now } }] },
+        { $set: { status: 'claimed', claimedBy: harness, claimExpiresAt: new Date(now.getTime() + leaseMinutes * 60 * 1000), lastHeartbeatAt: now } },
         { sort: { priority: -1, createdAt: 1 }, new: true }
       );
       if (!job) return res.json({ job: null, message: 'No research jobs are waiting for a host.' });
@@ -491,22 +397,18 @@ export function createResearchJobRouter() {
       if (!mongoose.isValidObjectId(req.params.id)) return res.status(400).json({ message: 'Invalid research job id' });
       const job = await ResearchJobModel.findById(req.params.id);
       if (!job) return res.status(404).json({ message: 'Research job not found' });
-      if (req.body?.advancePass ?? req.body?.advance_pass) job.researchPass = Math.min(job.researchPass + 1, job.maxPasses);
+      const advancePass = Boolean(req.body?.advancePass ?? req.body?.advance_pass);
+      if (advancePass) job.researchPass = Math.min(job.researchPass + 1, job.maxPasses);
       const coverage = await calculateCoverage(job);
-      const forcedForward = job.researchPass >= job.maxPasses;
+      const forcedForward = advancePass && job.researchPass >= job.maxPasses;
       job.coverage = coverage;
       job.gaps = coverage.gaps;
-      if (!['complete', 'failed', 'opportunity-validation'].includes(job.status)) {
+      const mayAdvanceStage = advancePass || ACTIVE_STATUSES.includes(job.status);
+      if (mayAdvanceStage && !['complete', 'failed', 'opportunity-validation'].includes(job.status)) {
         job.status = coverage.readyForSemantic || forcedForward ? 'semantic-analysis' : 'gap-research';
       }
       await job.save();
-      return res.json({
-        job: serializeJob(job),
-        coverage,
-        readyForSemantic: coverage.readyForSemantic || forcedForward,
-        forcedForward,
-        remainingPasses: Math.max(0, job.maxPasses - job.researchPass),
-      });
+      return res.json({ job: serializeJob(job), coverage, readyForSemantic: coverage.readyForSemantic || forcedForward, forcedForward, remainingPasses: Math.max(0, job.maxPasses - job.researchPass) });
     } catch (error) {
       console.error('Failed to evaluate research coverage:', error);
       return res.status(500).json({ message: 'Failed to evaluate research coverage' });
@@ -542,10 +444,7 @@ export function createResearchJobRouter() {
       if (!hostRun) return res.status(404).json({ message: 'Linked host research run not found' });
       if (hostRun.status !== 'complete') return res.status(409).json({ message: 'Semantic synthesis must be complete before opportunity validation' });
       return res.json({
-        job: serializeJob(job),
-        opportunities: hostRun.opportunities || [],
-        clusters: hostRun.clusters || [],
-        coverage: job.coverage || {},
+        job: serializeJob(job), opportunities: hostRun.opportunities || [], clusters: hostRun.clusters || [], coverage: job.coverage || {},
         validationContract: {
           objective: 'Challenge each opportunity against the current market before recommending a build.',
           research: ['existing products and direct substitutes', 'pricing and packaging', 'complaints about current solutions', 'switching barriers', 'underserved segment', 'evidence of willingness to pay'],
