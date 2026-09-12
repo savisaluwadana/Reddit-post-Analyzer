@@ -43,6 +43,7 @@ jobs:
           node --check server/researchSearchRoutes.js
           node --check server/reliabilityCore.js
           node --check server/reliabilityRoutes.js
+          node --check server/integrityGuardRoutes.js
           node --check mcp/hostTools.js
           node --check mcp/searchTools.js
           node --check mcp/server.js
