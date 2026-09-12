@@ -64,6 +64,21 @@ export function createIntegrityGuardRouter() {
     }
   });
 
+  // Reject duplicate/empty opportunity identifiers before the host synthesis route can
+  // persist an ambiguous result that cannot later satisfy one-validation-per-opportunity.
+  router.post('/host-intelligence/runs/:id/synthesis', (req, res, next) => {
+    const opportunities = Array.isArray(req.body?.opportunities) ? req.body.opportunities : [];
+    const ids = opportunities.map((item) => String(item?.opportunityId ?? item?.opportunity_id ?? item?.id ?? '').trim().toLowerCase());
+    if (ids.some((id) => !id)) return res.status(400).json({ message: 'Every synthesized opportunity must have a non-empty opportunity id.' });
+    const unique = new Set(ids);
+    if (unique.size !== ids.length) {
+      const seen = new Set();
+      const duplicates = [...new Set(ids.filter((id) => seen.has(id) || !seen.add(id)))];
+      return res.status(400).json({ message: 'Synthesized opportunities must have unique opportunity ids.', duplicateOpportunityIds: duplicates.slice(0, 20) });
+    }
+    return next();
+  });
+
   // Search/deep-scrape audit memory is part of the evidence collection phase. Keeping it
   // immutable after semantic handoff prevents late browsing activity from rewriting the
   // quality/audit trail underneath an in-progress or completed semantic run.
