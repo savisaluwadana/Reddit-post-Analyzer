@@ -28,6 +28,9 @@ jobs:
       - name: Lint
         run: npm run lint
 
+      - name: Unit tests
+        run: npm test
+
       - name: Check server syntax
         run: |
           node --check server/index.js
@@ -38,6 +41,9 @@ jobs:
           node --check server/researchJobRoutes.js
           node --check server/researchSearchPlanner.js
           node --check server/researchSearchRoutes.js
+          node --check server/reliabilityCore.js
+          node --check server/reliabilityRoutes.js
+          node --check server/integrityGuardRoutes.js
           node --check mcp/hostTools.js
           node --check mcp/searchTools.js
           node --check mcp/server.js
@@ -59,6 +65,7 @@ jobs:
           echo "$OUTPUT" | grep '"name":"record_research_search_progress"'
           echo "$OUTPUT" | grep '"name":"evaluate_research_evidence_quality"'
           echo "$OUTPUT" | grep '"name":"get_research_search_memory"'
+          echo "$OUTPUT" | grep '"name":"complete_research_job_without_opportunities"'
           echo "$OUTPUT" | grep '"name":"evaluate_research_job_coverage"'
           echo "$OUTPUT" | grep '"name":"start_job_semantic_analysis"'
           echo "$OUTPUT" | grep '"name":"get_research_job_validation_pack"'
@@ -71,6 +78,7 @@ jobs:
           echo "$OUTPUT" | grep '"name":"get_research_graph"'
           echo "$OUTPUT" | grep 'No model API key is required'
           echo "$OUTPUT" | grep 'source-aware search plans'
+          ! grep -Eq '"(openai|@anthropic-ai/sdk)"' package.json
 
       - name: Build
         run: npm run build

@@ -103,7 +103,7 @@ export function ResearchJobsPanel() {
         <div>
           <div className="eyebrow">Autonomous research queue</div>
           <h3>Start deep research from one question</h3>
-          <p>Queue the question here. The MCP host now expands it into source-aware search missions, deep-scrapes evidence-rich threads, tracks search memory, hunts counter-evidence, measures evidence independence, fills gaps, runs semantic synthesis, and validates the market.</p>
+          <p>Queue the question here. The MCP host expands it into source-aware search missions, deep-scrapes evidence-rich threads, tracks search memory, hunts counter-evidence, measures evidence independence, fills gaps, runs semantic synthesis, and validates the market.</p>
         </div>
         <div className="research-job-stats">
           <span><b>{activeJobs}</b> active</span>
@@ -126,7 +126,7 @@ export function ResearchJobsPanel() {
       <div className="research-job-agent-note">
         <strong>MCP worker flow</strong>
         <code>claim_research_job → get_research_search_plan</code>
-        <span>Search breadth, deep-thread traversal, contradiction hunting and evidence-quality checks now happen before semantic synthesis. No model API key is stored by this app.</span>
+        <span>Search breadth, deep-thread traversal, contradiction hunting and evidence-quality checks happen before semantic synthesis. No model API key is stored by this app.</span>
       </div>
 
       {message && <div className="cross-source-message">{message}</div>}
@@ -137,6 +137,10 @@ export function ResearchJobsPanel() {
           const coverage = job.coverage;
           const metrics = coverage?.metrics;
           const quality = qualityByJob[job._id];
+          const independentStories = quality?.independence.effectiveIndependentCount
+            ?? quality?.independence.independentStoryCount
+            ?? quality?.independence.independentEvidenceCount
+            ?? 0;
           const verdicts = job.opportunityValidations.reduce<Record<string, number>>((acc, item) => {
             acc[item.verdict] = (acc[item.verdict] ?? 0) + 1;
             return acc;
@@ -167,15 +171,16 @@ export function ResearchJobsPanel() {
               {quality && (
                 <div className="research-search-quality">
                   <div className="research-search-quality-grid">
-                    <span><b>{quality.independence.independentEvidenceCount}</b> independent</span>
+                    <span><b>{independentStories}</b> independent stories</span>
                     <span><b>{pct(quality.independence.duplicationRate)}</b> near-duplicate</span>
+                    <span><b>{pct(quality.independence.largestStoryGroupShare)}</b> largest root</span>
                     <span><b>{quality.signals.strongCommercial}</b> strong commercial</span>
                     <span><b>{quality.signals.quantifiedImpact}</b> quantified impact</span>
                     <span><b>{quality.signals.contradictionCandidates}</b> counter-evidence</span>
                     <span><b>{quality.deepScraping.runs}</b> deep scrapes</span>
                   </div>
                   <div className={`research-quality-gate ${quality.readyForSynthesis ? 'ready' : 'not-ready'}`}>
-                    {quality.readyForSynthesis ? 'Evidence quality gate passed' : 'More search/deep-scrape work recommended before synthesis'}
+                    {quality.readyForSynthesis ? 'Evidence quality gate passed' : 'More independent search/deep-scrape work recommended before synthesis'}
                   </div>
                   {quality.gaps.length > 0 && (
                     <div className="research-quality-gaps">
@@ -193,7 +198,7 @@ export function ResearchJobsPanel() {
 
               {job.gaps.length > 0 && job.status !== 'complete' && (
                 <div className="research-job-gaps">
-                  <strong>Coverage gaps</strong>
+                  <strong>Coverage and quality gaps</strong>
                   {job.gaps.slice(0, 4).map((gap) => <span key={gap.gap} className={`gap-${gap.priority}`}>{gap.goal}</span>)}
                 </div>
               )}

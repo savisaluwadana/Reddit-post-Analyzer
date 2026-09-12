@@ -4,7 +4,9 @@ import express from 'express';
 import mongoose from 'mongoose';
 import { createEvidenceRouter } from './evidenceRoutes.js';
 import { createHostIntelligenceRouter } from './hostIntelligenceRoutes.js';
+import { createIntegrityGuardRouter } from './integrityGuardRoutes.js';
 import { createPainScanRouter } from './painScanRoutes.js';
+import { createReliabilityRouter } from './reliabilityRoutes.js';
 import { createResearchJobRouter } from './researchJobRoutes.js';
 import { createResearchSearchRouter } from './researchSearchRoutes.js';
 
@@ -23,6 +25,10 @@ if (!mongoUri) {
 
 app.use(cors({ origin: allowedOrigin }));
 app.use(express.json({ limit: '2mb' }));
+// State and reference guards intentionally run before the reliability/legacy feature routers.
+// They prevent destructive or backward transitions while allowing unaffected requests through.
+app.use('/api', createIntegrityGuardRouter());
+app.use('/api', createReliabilityRouter());
 app.use('/api/pain-scans', createPainScanRouter());
 app.use('/api/evidence', createEvidenceRouter());
 app.use('/api/host-intelligence', createHostIntelligenceRouter());
@@ -127,6 +133,9 @@ app.get('/api/health', (_req, res) => {
       'search-memory',
       'evidence-independence',
       'contradiction-hunting',
+      'multi-batch-evidence-membership',
+      'research-state-invariants',
+      'reference-integrity-guards',
     ],
     llmMode: 'mcp-host',
     llmApiKeyRequired: false,
