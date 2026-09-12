@@ -145,7 +145,14 @@ export type PainCategory =
   | 'workflow-process'
   | 'missing-capability'
   | 'support'
-  | 'data-migration';
+  | 'data-migration'
+  | 'access-availability'
+  | 'quality'
+  | 'communication'
+  | 'billing-payments'
+  | 'fulfillment-logistics'
+  | 'trust-safety'
+  | 'discovery-comparison';
 
 export interface PainEvidence {
   sourceType: 'post' | 'comment';
@@ -239,4 +246,129 @@ export interface PainTrendDelta {
 export interface PainHistoryResponse {
   scans: PersistedPainScan[];
   comparison: PainTrendDelta[];
+}
+
+export type EvidenceSourceKind =
+  | 'reddit'
+  | 'forum'
+  | 'social'
+  | 'review'
+  | 'github'
+  | 'support'
+  | 'survey'
+  | 'news'
+  | 'blog'
+  | 'community'
+  | 'marketplace'
+  | 'app-store'
+  | 'web'
+  | 'other';
+
+export interface PlatformEvidenceItem {
+  id?: string;
+  externalId?: string;
+  sourceKind: EvidenceSourceKind;
+  sourceName: string;
+  sourceUrl?: string;
+  community?: string;
+  author?: string;
+  title?: string;
+  text: string;
+  publishedAt?: string;
+  engagementScore?: number;
+  commentsCount?: number;
+  tags?: string[];
+  batchId?: string;
+  ingestedBy?: string;
+  createdAt?: string;
+}
+
+export interface EvidenceStats {
+  total: number;
+  byKind: Array<{ sourceKind: string; count: number }>;
+  bySource: Array<{ sourceName: string; count: number }>;
+}
+
+export interface CrossSourcePainEvidence {
+  sourceKind: string;
+  sourceName: string;
+  externalId?: string;
+  community?: string;
+  author?: string;
+  title?: string;
+  text: string;
+  url?: string;
+  engagementScore: number;
+  category: string;
+  severity: number;
+  commercialIntent: number;
+  urgency: number;
+  workaroundBurden: number;
+  personas: string[];
+  keywords: string[];
+}
+
+export interface CrossSourcePainCluster {
+  id: string;
+  category: string;
+  label: string;
+  painScore: number;
+  severity: number;
+  recurrence: number;
+  commercialIntent: number;
+  urgency: number;
+  workaroundBurden: number;
+  confidence: number;
+  evidenceCount: number;
+  distinctSources: number;
+  distinctCommunities: number;
+  personas: string[];
+  keywords: string[];
+  evidence: CrossSourcePainEvidence[];
+  opportunityReason: string;
+}
+
+export interface CrossSourcePainReport {
+  generatedAt: string;
+  evidenceScanned: number;
+  painEvidence: number;
+  highIntentEvidence: number;
+  workaroundEvidence: number;
+  sourcesScanned: number;
+  sourceKinds: Array<{ sourceKind: string; count: number }>;
+  sourceNames: Array<{ sourceName: string; count: number }>;
+  clusters: CrossSourcePainCluster[];
+  categories: Array<{ category: string; evidenceCount: number; painScore: number }>;
+  topPersonas: Array<{ persona: string; mentions: number }>;
+}
+
+export interface CrossSourceScan {
+  _id: string;
+  name: string;
+  generatedAt: string;
+  evidenceScanned: number;
+  painEvidence: number;
+  highIntentEvidence: number;
+  workaroundEvidence: number;
+  sourcesScanned: number;
+  clusters: CrossSourcePainCluster[];
+  createdAt: string;
+}
+
+export interface CrossSourceTrendDelta {
+  id: string;
+  label: string;
+  category: string;
+  currentScore: number;
+  previousScore: number;
+  delta: number;
+  confidence: number;
+  commercialIntent: number;
+  recurrence: number;
+  status: PainTrendStatus;
+}
+
+export interface CrossSourceHistoryResponse {
+  scans: CrossSourceScan[];
+  comparison: CrossSourceTrendDelta[];
 }
