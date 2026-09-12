@@ -46,6 +46,8 @@ export function calculateExperimentSignal(experiment = {}) {
   let score = verdictBase * 0.58 + responseSignal * 0.18 + conversionSignal * 0.10 + sampleConfidence * 0.14;
   score += commercialBoost + revenueBoost + pipelineBoost;
   if (verdict === 'refutes') score = Math.min(score, 35);
+  const observed = sampleSize + responses + paidCommitments + (revenue > 0 ? 1 : 0);
+  if (observed === 0) score = Math.min(score, 45);
 
   return {
     score: round(clamp(score)),
@@ -126,16 +128,19 @@ export function calculateFounderFitScore(assessment = {}) {
   return { score: round(score), components };
 }
 
-export function calculateOpportunityDecision({ researchScore = 0, experiments = [], founderFit = {} } = {}) {
+export function calculateOpportunityDecision({ researchScore = 0, experiments = [], founderFit = {}, marketValidationVerdict = '' } = {}) {
   const research = clamp(researchScore);
   const validation = calculateValidationSummary(experiments);
   const fit = calculateFounderFitScore(founderFit);
   const hasValidation = validation.completedExperiments > 0;
+  const priorVerdict = String(marketValidationVerdict || '').toLowerCase();
 
   let decisionScore = hasValidation
     ? research * 0.50 + validation.score * 0.35 + fit.score * 0.15
     : research * 0.78 + fit.score * 0.22;
 
+  if (!hasValidation && priorVerdict === 'reject') decisionScore = Math.min(decisionScore, 45);
+  if (!hasValidation && priorVerdict === 'watch') decisionScore = Math.min(decisionScore, 58);
   if (validation.refutingExperiments >= Math.max(2, Math.ceil(validation.completedExperiments / 2))) decisionScore = Math.min(decisionScore, 48);
   if (validation.paidSignals > 0 && validation.supportingExperiments > validation.refutingExperiments) decisionScore = Math.min(100, decisionScore + 4);
   decisionScore = round(clamp(decisionScore));
@@ -143,7 +148,15 @@ export function calculateOpportunityDecision({ researchScore = 0, experiments = 
   let recommendation = 'validate';
   let nextAction = 'Run at least two independent validation experiments before committing to a build.';
   if (validation.completedExperiments === 0) {
-    recommendation = research >= 55 ? 'validate' : 'watch';
+    if (priorVerdict === 'reject') {
+      recommendation = 'stop';
+      nextAction = 'The prior market-validation stage rejected this opportunity. Reopen only with a materially different segment or thesis.';
+    } else if (priorVerdict === 'watch') {
+      recommendation = 'watch';
+      nextAction = 'Keep the opportunity on the watchlist until new market evidence justifies a fresh validation cycle.';
+    } else {
+      recommendation = research >= 55 ? 'validate' : 'watch';
+    }
   } else if (decisionScore >= 78 && validation.completedExperiments >= 2 && validation.paidSignals > 0) {
     recommendation = 'build';
     nextAction = 'Convert validated demand into a narrow MVP/build specification and a paid-pilot plan.';
@@ -163,9 +176,10 @@ export function calculateOpportunityDecision({ researchScore = 0, experiments = 
     recommendation,
     nextAction,
     researchScore: round(research),
+    priorMarketValidationVerdict: priorVerdict,
     validation,
     founderFit: fit,
-    rule: 'Build requires a high combined score, at least two completed experiments, and at least one paid/commercial signal.',
+    rule: 'Build requires a high combined score, at least two completed experiments, and at least one actual paid/commercial signal.',
   };
 }
 
