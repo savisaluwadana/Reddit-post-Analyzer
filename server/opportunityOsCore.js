@@ -37,7 +37,8 @@ export function calculateExperimentSignal(experiment = {}) {
   const responseSignal = responseRate === null ? 50 : responseRate * 100;
   const conversionSignal = Number.isFinite(conversionRate) ? clamp(conversionRate) : 50;
   const sampleConfidence = clamp(Math.log10(Math.max(1, sampleSize + responses + 1)) * 35);
-  const paidSignal = paidCommitments > 0 || revenue > 0 || ['presale','paid-pilot'].includes(normalizeExperimentType(experiment.type));
+  // A presale/pilot experiment is not a commercial signal until someone actually commits money.
+  const paidSignal = paidCommitments > 0 || revenue > 0;
   const commercialBoost = paidCommitments > 0 ? Math.min(12, 5 + Math.log10(paidCommitments + 1) * 5) : 0;
   const revenueBoost = revenue > 0 ? Math.min(10, 3 + Math.log10(revenue + 1) * 2) : 0;
   const pipelineBoost = pipelineValue > 0 ? Math.min(5, Math.log10(pipelineValue + 1)) : 0;
