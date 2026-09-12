@@ -1,13 +1,29 @@
-import { useMemo, useState } from 'react';
+import { useEffect, useMemo, useState } from 'react';
 import { Controls } from './components/Controls';
 import { CsvVisualizer } from './components/CsvVisualizer';
 import { IntelligencePanel } from './components/IntelligencePanel';
 import { PostList } from './components/PostList';
+import { ResearchProjectsPanel } from './components/ResearchProjectsPanel';
 import { ResearchToolbar } from './components/ResearchToolbar';
 import { StatsBar } from './components/StatsBar';
-import type { RedditPost, SignalFilter, SortMode, SummaryStats } from './types';
+import { TrendPanel } from './components/TrendPanel';
+import type {
+  RedditPost,
+  ResearchProject,
+  ResearchProjectInput,
+  SignalFilter,
+  SortMode,
+  SummaryStats,
+  TrendResponse,
+} from './types';
 import { analyzePosts, calculatePostIntelligence } from './utils/analytics';
 import { savePostsToDatabase } from './utils/postStorageApi';
+import {
+  createResearchProject,
+  deleteResearchProject,
+  fetchTrends,
+  listResearchProjects,
+} from './utils/researchApi';
 import { fetchAllPosts } from './utils/redditApi';
 
 function App() {
@@ -30,22 +46,32 @@ function App() {
   const [sortMode, setSortMode] = useState<SortMode>('opportunity');
   const [signalFilter, setSignalFilter] = useState<SignalFilter>('all');
   const [minScore, setMinScore] = useState(0);
+  const [minComments, setMinComments] = useState(0);
+
+  const [projects, setProjects] = useState<ResearchProject[]>([]);
+  const [isProjectLoading, setIsProjectLoading] = useState(false);
+  const [trend, setTrend] = useState<TrendResponse | null>(null);
+  const [trendDays, setTrendDays] = useState(14);
+  const [trendSubreddit, setTrendSubreddit] = useState('');
+  const [isTrendLoading, setIsTrendLoading] = useState(false);
 
   const displayedPosts = useMemo(() => {
     const normalizedQuery = query.trim().toLowerCase();
+    const queryTerms = normalizedQuery.split(',').map((term) => term.trim()).filter(Boolean);
 
     const filtered = posts.filter((post) => {
       if (post.score < minScore) return false;
+      if ((post.num_comments ?? 0) < minComments) return false;
 
       const intel = calculatePostIntelligence(post);
       if (signalFilter !== 'all' && !intel.signals.includes(signalFilter)) return false;
 
-      if (!normalizedQuery) return true;
+      if (queryTerms.length === 0) return true;
       const haystack = [post.title, post.selftext, post.subreddit, post.author, post.domain, post.link_flair_text]
         .filter(Boolean)
         .join(' ')
         .toLowerCase();
-      return haystack.includes(normalizedQuery);
+      return queryTerms.some((term) => haystack.includes(term));
     });
 
     return [...filtered].sort((a, b) => {
@@ -60,9 +86,39 @@ function App() {
       }
       return bIntel.opportunityScore - aIntel.opportunityScore;
     });
-  }, [posts, query, signalFilter, minScore, sortMode]);
+  }, [posts, query, signalFilter, minScore, minComments, sortMode]);
 
   const insights = useMemo(() => analyzePosts(displayedPosts), [displayedPosts]);
+  const availableSubreddits = useMemo(() => {
+    return [...new Set([...subreddits, ...posts.map((post) => post.subreddit)])].sort((a, b) => a.localeCompare(b));
+  }, [posts, subreddits]);
+
+  const refreshProjects = async () => {
+    setIsProjectLoading(true);
+    try {
+      setProjects(await listResearchProjects());
+    } catch (error) {
+      setErrors((previous) => [...previous, error instanceof Error ? error.message : 'Failed to load research projects']);
+    } finally {
+      setIsProjectLoading(false);
+    }
+  };
+
+  const refreshTrends = async (days = trendDays, subreddit = trendSubreddit) => {
+    setIsTrendLoading(true);
+    try {
+      setTrend(await fetchTrends(days, subreddit || undefined));
+    } catch (error) {
+      setErrors((previous) => [...previous, error instanceof Error ? error.message : 'Failed to load trend history']);
+    } finally {
+      setIsTrendLoading(false);
+    }
+  };
+
+  useEffect(() => {
+    void refreshProjects();
+    void refreshTrends();
+  }, []);
 
   const handleFetch = async () => {
     setIsLoading(true);
@@ -105,7 +161,8 @@ function App() {
     setSaveMessage('');
     try {
       const result = await savePostsToDatabase(posts);
-      setSaveMessage(`Saved ${result.processedCount} posts (${result.insertedCount} inserted, ${result.modifiedCount} updated).`);
+      setSaveMessage(`Saved ${result.processedCount} posts (${result.insertedCount} inserted, ${result.modifiedCount} updated) and captured history.`);
+      await refreshTrends();
     } catch (saveError: unknown) {
       const message = `Database save failed: ${saveError instanceof Error ? saveError.message : 'Unknown error'}`;
       setSaveMessage(message);
@@ -113,6 +170,39 @@ function App() {
     } finally {
       setIsSavingData(false);
     }
+  };
+
+  const handleCreateProject = async (input: ResearchProjectInput) => {
+    setIsProjectLoading(true);
+    try {
+      const project = await createResearchProject(input);
+      setProjects((previous) => [project, ...previous.filter((item) => item._id !== project._id)]);
+    } finally {
+      setIsProjectLoading(false);
+    }
+  };
+
+  const handleLoadProject = (project: ResearchProject) => {
+    setSubreddits(project.subreddits);
+    setQuery(project.keywords.join(', '));
+    setMinScore(project.minScore);
+    setMinComments(project.minComments);
+    setSignalFilter(project.signalFilter);
+    setSortMode(project.sortMode);
+    setTrendSubreddit(project.subreddits.length === 1 ? project.subreddits[0] : '');
+  };
+
+  const handleDeleteProject = async (projectId: string) => {
+    try {
+      await deleteResearchProject(projectId);
+      setProjects((previous) => previous.filter((project) => project._id !== projectId));
+    } catch (error) {
+      setErrors((previous) => [...previous, error instanceof Error ? error.message : 'Failed to delete research project']);
+    }
+  };
+
+  const handleTrendRefresh = () => {
+    void refreshTrends(trendDays, trendSubreddit);
   };
 
   return (
@@ -123,7 +213,7 @@ function App() {
         <p className="header-desc">
           Discover high-signal Reddit conversations, recurring pain points, buying intent, fast-moving discussions and community-level opportunities.
         </p>
-        <div className="hero-note">Transparent heuristic scoring • No black-box AI required</div>
+        <div className="hero-note">Transparent heuristic scoring • Saved research projects • Historical momentum tracking</div>
       </header>
 
       <main>
@@ -138,6 +228,31 @@ function App() {
           setLimit={setLimit}
           onFetch={handleFetch}
           isLoading={isLoading}
+        />
+
+        <ResearchProjectsPanel
+          projects={projects}
+          subreddits={subreddits}
+          query={query}
+          minScore={minScore}
+          minComments={minComments}
+          signalFilter={signalFilter}
+          sortMode={sortMode}
+          onCreate={handleCreateProject}
+          onLoad={handleLoadProject}
+          onDelete={handleDeleteProject}
+          isLoading={isProjectLoading}
+        />
+
+        <TrendPanel
+          trend={trend}
+          days={trendDays}
+          setDays={setTrendDays}
+          subreddit={trendSubreddit}
+          setSubreddit={setTrendSubreddit}
+          availableSubreddits={availableSubreddits}
+          isLoading={isTrendLoading}
+          onRefresh={handleTrendRefresh}
         />
 
         {stats && (
@@ -162,6 +277,8 @@ function App() {
               setSignalFilter={setSignalFilter}
               minScore={minScore}
               setMinScore={setMinScore}
+              minComments={minComments}
+              setMinComments={setMinComments}
               resultCount={displayedPosts.length}
             />
             <IntelligencePanel insights={insights} posts={displayedPosts} />
