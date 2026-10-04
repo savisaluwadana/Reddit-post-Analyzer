@@ -1,12 +1,14 @@
 # Pain Intelligence Lab — 5-minute quick start
 
+**Updated runtime setup:** [Docker Compose and operations](DEPLOYMENT.md) now provide a complete built app at `http://localhost:4000` with persistent MongoDB. For native development keep using Vite at port 5173. See [Architecture](ARCHITECTURE.md), [API reference](API_REFERENCE.md), [Data model](DATA_MODEL.md) and [complete MCP schemas](MCP_REFERENCE.md) for the system reference.
+
 This is the shortest path from a fresh clone to a working research run.
 
 For the complete explanation of every workspace and workflow, continue with [USER_GUIDE.md](USER_GUIDE.md).
 
 ## 1. What you need
 
-- Node.js 22+
+- Node.js 22.12+
 - npm
 - MongoDB running locally or reachable through `MONGODB_URI`
 - Optional: Codex or Claude Code with MCP support if you want autonomous web research and host-model semantic analysis
@@ -18,7 +20,7 @@ The platform itself does **not** require an OpenAI, Anthropic, or embedding API 
 ```bash
 git clone https://github.com/savisaluwadana/Reddit-post-Analyzer.git
 cd Reddit-post-Analyzer
-npm install
+npm ci
 cp .env.example .env
 ```
 

@@ -11,9 +11,8 @@ export default defineConfig({
         changeOrigin: true,
       },
       '/reddit': {
-        target: 'https://www.reddit.com',
+        target: 'http://localhost:4000',
         changeOrigin: true,
-        rewrite: (path) => path.replace(/^\/reddit/, ''),
       },
     },
   },

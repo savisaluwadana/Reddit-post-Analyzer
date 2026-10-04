@@ -1,5 +1,7 @@
 # Pain Intelligence Lab — Complete User Guide
 
+**Updated runtime setup:** [Docker Compose and operations](DEPLOYMENT.md) now provide a complete built app at `http://localhost:4000` with persistent MongoDB. For native development keep using Vite at port 5173. See [Architecture](ARCHITECTURE.md), [API reference](API_REFERENCE.md), [Data model](DATA_MODEL.md) and [complete MCP schemas](MCP_REFERENCE.md) for the system reference.
+
 Pain Intelligence Lab is a cross-source research platform for turning public conversations, reviews, support threads, issues, forum discussions and other evidence into structured pain points, jobs-to-be-done, market signals and product opportunities.
 
 This guide explains how to use the platform from installation through autonomous research and final opportunity validation.
@@ -121,7 +123,7 @@ The platform therefore does not need an OpenAI API key, Anthropic API key or emb
 
 You need:
 
-- Node.js 22+
+- Node.js 22.12+
 - npm
 - MongoDB
 - a modern browser
@@ -154,7 +156,7 @@ docker run --name pain-intel-mongo -p 27017:27017 -d mongo:8
 ```bash
 git clone https://github.com/savisaluwadana/Reddit-post-Analyzer.git
 cd Reddit-post-Analyzer
-npm install
+npm ci
 cp .env.example .env
 ```
 

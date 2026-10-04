@@ -34,6 +34,18 @@ The primary end-user/operator manual. It covers:
 
 If you are unsure which document to read, read the User Guide.
 
+## System reference and operations
+
+| Guide | Use it for |
+| --- | --- |
+| [Architecture](ARCHITECTURE.md) | Understand runtime boundaries, module ownership, middleware order, job states and host processing diagrams |
+| [Data model](DATA_MODEL.md) | Collections, entity relationships, identity, provenance, retention and deletion behavior |
+| [HTTP API guide](API_REFERENCE.md) | Request contracts, examples, status codes, limits and workflows |
+| [Complete route inventory](API_ROUTES.md) | Every implemented API/relay method and path, generated from handlers |
+| [Complete MCP reference](MCP_REFERENCE.md) | All discovered tools and full nested input schemas |
+| [Deployment and operations](DEPLOYMENT.md) | One-command Compose setup, native development, environment settings, health, backups and recovery |
+| [Developer guide](DEVELOPMENT.md) | Extend the application, preserve invariants, run checks and regenerate references |
+
 ## Deeper technical guides
 
 ### [MCP Harness Integration](MCP.md)
@@ -84,95 +96,26 @@ Correctness invariants introduced during the full reliability audit, including m
 
 Read this before modifying research state, evidence ownership or destructive operations.
 
-## Recommended reading order
+## Recommended reading paths
 
-For a new user:
+- **New user:** Quick Start → User Guide → the guide for your workspace.
+- **Operator:** Deployment → Data model → System Audit.
+- **MCP integrator:** MCP → MCP Reference → Autonomous Research → Deep Research → Scraping Intelligence.
+- **Contributor:** Architecture → Data model → API guide → Developer guide → System Audit.
 
-```text
-QUICKSTART
-    ↓
-USER_GUIDE
+## Platform workflow
+
+```mermaid
+flowchart TD
+  Question["Research question"] --> Collection["Host search and adaptive evidence collection"]
+  Collection --> Gates{"Coverage and quality ready?"}
+  Gates -->|Fill gaps| Collection
+  Gates -->|Ready or pass cap| Semantic["Annotation, clusters and synthesis"]
+  Semantic --> Challenge["Competitor validation, consensus and sizing"]
+  Challenge --> Execution["Strategy and observed experiments"]
+  Execution --> Decision["Build, validate, watch or stop"]
 ```
 
-For someone integrating Codex or Claude Code:
-
-```text
-QUICKSTART
-    ↓
-USER_GUIDE
-    ↓
-MCP
-    ↓
-AUTONOMOUS_RESEARCH
-    ↓
-SCRAPING_INTELLIGENCE
-    ↓
-QUALITY_INTELLIGENCE
-    ↓
-OPPORTUNITY_OS
-```
-
-For someone developing the research engine:
-
-```text
-USER_GUIDE
-    ↓
-SCRAPING_INTELLIGENCE
-    ↓
-DEEP_RESEARCH
-    ↓
-HOST_LLM
-    ↓
-QUALITY_INTELLIGENCE
-    ↓
-OPPORTUNITY_OS
-    ↓
-SYSTEM_AUDIT
-```
-
-## Platform workflow at a glance
-
-```text
-Research question
-      ↓
-Research job
-      ↓
-source-aware search missions
-      ↓
-adaptive crawl frontier
-      ↓
-canonical URL dedup + priority ranking
-      ↓
-source-specific public-page traversal
-      ↓
-extraction-quality + marginal-yield checks
-      ↓
-Evidence ingestion
-      ↓
-Coverage + quality gates
-      ↓
-Semantic annotation
-      ↓
-Semantic pain clusters + JTBD
-      ↓
-Opportunity synthesis
-      ↓
-Competitor / pricing validation
-      ↓
-Post-synthesis quality challenge
-      ↓
-lineage + consensus + canonical entities
-+ deterministic scoring + sourced market sizing
-      ↓
-Opportunity OS workspace
-      ↓
-strategy + founder/team fit
-      ↓
-real validation experiments
-      ↓
-Build / Validate / Watch / Stop
-      ↓
-MVP specification + first-customer GTM
-```
+Detailed runtime, state, sequence and data relationship diagrams are in [Architecture](ARCHITECTURE.md) and [Data model](DATA_MODEL.md).
 
 The platform itself does not require an OpenAI, Anthropic, embedding, scraping, or proxy API key. The connected MCP host supplies browsing and semantic reasoning from its own session.

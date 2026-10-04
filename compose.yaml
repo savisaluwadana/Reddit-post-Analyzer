@@ -1,0 +1,34 @@
+services:
+  mongo:
+    image: mongo:8
+    restart: unless-stopped
+    volumes:
+      - mongo-data:/data/db
+    healthcheck:
+      test: ["CMD", "mongosh", "--quiet", "--eval", "quit(db.adminCommand('ping').ok ? 0 : 1)"]
+      interval: 10s
+      timeout: 5s
+      retries: 10
+      start_period: 20s
+  app:
+    build: .
+    init: true
+    restart: unless-stopped
+    ports:
+      - "127.0.0.1:${APP_PORT:-4000}:4000"
+    environment:
+      MONGODB_URI: mongodb://mongo:27017/reddit_post_analyzer
+      PORT: 4000
+      CLIENT_ORIGIN: "${CLIENT_ORIGIN:-http://localhost:4000}"
+      SNAPSHOT_RETENTION_DAYS: "${SNAPSHOT_RETENTION_DAYS:-90}"
+    depends_on:
+      mongo:
+        condition: service_healthy
+    healthcheck:
+      test: ["CMD", "node", "-e", "fetch('http://127.0.0.1:4000/api/health').then(r=>process.exit(r.ok?0:1)).catch(()=>process.exit(1))"]
+      interval: 15s
+      timeout: 5s
+      retries: 5
+      start_period: 20s
+volumes:
+  mongo-data:
