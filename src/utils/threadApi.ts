@@ -1,3 +1,4 @@
+import { requestRedditJson } from './redditRequest.ts';
 import type { RedditComment, RedditPost } from '../types';
 
 interface FetchCommentsResult {
@@ -63,34 +64,12 @@ function flattenCommentChildren(children: RedditCommentNode[], post: RedditPost,
 export async function fetchThreadComments(post: RedditPost, limit = 40): Promise<RedditComment[]> {
   const safeLimit = Math.min(Math.max(limit, 10), 100);
   const query = `limit=${safeLimit}&sort=top&raw_json=1`;
-  const urls = [
-    `/reddit/comments/${encodeURIComponent(post.id)}.json?${query}`,
-    `https://www.reddit.com/comments/${encodeURIComponent(post.id)}.json?${query}`,
-  ];
-
-  let lastError: Error | null = null;
-
-  for (const url of urls) {
-    try {
-      const response = await fetch(url, { headers: { Accept: 'application/json' } });
-      if (!response.ok) {
-        lastError = new Error(`HTTP ${response.status} ${response.statusText}`);
-        continue;
-      }
-
-      const payload = await response.json() as RedditThreadListing[];
-      const children = payload?.[1]?.data?.children;
-      if (!Array.isArray(children)) return [];
-
-      return flattenCommentChildren(children, post)
-        .sort((a, b) => b.score - a.score)
-        .slice(0, safeLimit);
-    } catch (error) {
-      lastError = error instanceof Error ? error : new Error('Failed to fetch Reddit comments');
-    }
-  }
-
-  throw lastError ?? new Error('Failed to fetch Reddit comments');
+  const payload = await requestRedditJson<RedditThreadListing[]>(`/reddit/comments/${encodeURIComponent(post.id)}.json?${query}`);
+  const children = payload?.[1]?.data?.children;
+  if (!Array.isArray(children)) throw new Error('Reddit returned an invalid comment listing');
+  return flattenCommentChildren(children, post)
+    .sort((a, b) => b.score - a.score)
+    .slice(0, safeLimit);
 }
 
 export async function fetchCommentsForPosts(

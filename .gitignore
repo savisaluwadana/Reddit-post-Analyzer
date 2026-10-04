@@ -27,3 +27,6 @@ pnpm-debug.log*
 *.pid
 *.seed
 *.pid.lock
+
+# Database backups
+*.archive.gz

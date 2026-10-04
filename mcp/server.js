@@ -15,6 +15,7 @@ function log(message) {
 async function requestJson(path, options = {}) {
   const response = await fetch(`${API_URL}${path}`, {
     ...options,
+    signal: options.signal || AbortSignal.timeout(30000),
     headers: {
       Accept: 'application/json',
       'Content-Type': 'application/json',

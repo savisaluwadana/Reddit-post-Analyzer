@@ -1,3 +1,4 @@
+import { requestRedditJson } from './redditRequest.ts';
 import type { RedditPost, TimeFilter } from '../types';
 
 interface RedditListingChild {
@@ -45,53 +46,22 @@ export function mapDateToTimeFilter(fromDate: Date): TimeFilter {
 async function fetchSubreddit(subreddit: string, limit: number, timeFilter: TimeFilter): Promise<RedditPost[]> {
   const safeSubreddit = encodeURIComponent(subreddit.trim());
   const query = `t=${timeFilter}&limit=${Math.min(Math.max(limit, 1), 100)}&raw_json=1`;
-  const urls = [
-    `/reddit/r/${safeSubreddit}/top.json?${query}`,
-    `https://www.reddit.com/r/${safeSubreddit}/top.json?${query}`,
-  ];
-
-  let lastError: Error | null = null;
-
-  for (const url of urls) {
-    try {
-      const response = await fetch(url, { headers: { Accept: 'application/json' } });
-
-      if (!response.ok) {
-        lastError = new Error(`HTTP ${response.status} ${response.statusText}`);
-        continue;
-      }
-
-      const data = await response.json() as RedditListingResponse;
-      const children = Array.isArray(data?.data?.children) ? data.data.children : [];
-
-      return children.map((child) => ({
-        id: child.data.id,
-        subreddit: child.data.subreddit,
-        title: child.data.title,
-        score: Number(child.data.score ?? 0),
-        author: child.data.author ?? '[deleted]',
-        created_utc: Number(child.data.created_utc ?? 0),
-        permalink: child.data.permalink,
-        url: child.data.url,
-        post_hint: child.data.post_hint,
-        selftext: child.data.selftext,
-        is_video: Boolean(child.data.is_video),
-        is_gallery: Boolean(child.data.is_gallery),
-        num_comments: Number(child.data.num_comments ?? 0),
-        upvote_ratio: Number(child.data.upvote_ratio ?? 0),
-        total_awards_received: Number(child.data.total_awards_received ?? 0),
-        domain: child.data.domain,
-        link_flair_text: child.data.link_flair_text,
-      }));
-    } catch (error) {
-      lastError = error instanceof Error ? error : new Error('Failed to fetch subreddit data');
-    }
-  }
-
-  throw new Error(lastError?.message || 'Failed to fetch subreddit data');
+  const data = await requestRedditJson<RedditListingResponse>(`/reddit/r/${safeSubreddit}/top.json?${query}`);
+  if (!Array.isArray(data?.data?.children)) throw new Error('Reddit returned an invalid post listing');
+  return data.data.children.filter((child) => child?.data?.id && child.data.title).map((child) => ({
+    ...child.data,
+    score: Number(child.data.score ?? 0),
+    author: child.data.author ?? '[deleted]',
+    created_utc: Number(child.data.created_utc ?? 0),
+    is_video: Boolean(child.data.is_video),
+    is_gallery: Boolean(child.data.is_gallery),
+    num_comments: Number(child.data.num_comments ?? 0),
+    upvote_ratio: Number(child.data.upvote_ratio ?? 0),
+    total_awards_received: Number(child.data.total_awards_received ?? 0),
+  }));
 }
 
-/** Fetches several communities in parallel, then deduplicates and strictly applies the requested date range. */
+/** Fetches communities with bounded concurrency, then deduplicates and strictly applies the requested date range. */
 export async function fetchAllPosts(
   subreddits: string[],
   limit: number,
@@ -106,9 +76,17 @@ export async function fetchAllPosts(
     throw new Error('The start date must be before the end date.');
   }
 
-  const cleanSubreddits = [...new Set(subreddits.map((sub) => sub.trim().replace(/^\/?r\//i, '')).filter(Boolean))];
+  const cleanSubreddits = [...new Set(subreddits.map((sub) => sub.trim().replace(/^\/?r\//i, '').toLowerCase()).filter(Boolean))];
+  if (cleanSubreddits.length > 25) throw new Error('Collect at most 25 communities at a time.');
+  if (cleanSubreddits.some((sub) => !/^[a-z0-9_]{2,21}$/.test(sub))) {
+    throw new Error('Use valid subreddit names, for example webdev or r/webdev.');
+  }
   const timeFilter = mapDateToTimeFilter(fromDate);
-  const results = await Promise.allSettled(cleanSubreddits.map((sub) => fetchSubreddit(sub, limit, timeFilter)));
+  const results: PromiseSettledResult<RedditPost[]>[] = [];
+  for (let index = 0; index < cleanSubreddits.length; index += 3) {
+    results.push(...await Promise.allSettled(cleanSubreddits.slice(index, index + 3)
+      .map((sub) => fetchSubreddit(sub, limit, timeFilter))));
+  }
 
   const postMap = new Map<string, RedditPost>();
   const errors: string[] = [];
