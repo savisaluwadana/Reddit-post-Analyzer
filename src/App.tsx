@@ -7,6 +7,7 @@ import { HostIntelligencePanel } from './components/HostIntelligencePanel';
 import { IntelligencePanel } from './components/IntelligencePanel';
 import { OpportunityOsPanel } from './components/OpportunityOsPanel';
 import { PainPointLab } from './components/PainPointLab';
+import { RedditAccessNotice } from './components/RedditAccessNotice';
 import { PostList } from './components/PostList';
 import { QualityIntelligencePanel } from './components/QualityIntelligencePanel';
 import { ResearchProjectsPanel } from './components/ResearchProjectsPanel';
@@ -284,6 +285,7 @@ function App() {
         </section>
 
         <section className="page" hidden={page !== 'reddit'}>
+          <RedditAccessNotice hasAccessError={errors.some((message) => message.includes('HTTP 403'))} />
           <Controls
             subreddits={subreddits}
             setSubreddits={setSubreddits}

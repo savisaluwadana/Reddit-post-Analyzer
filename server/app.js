@@ -71,7 +71,7 @@ const postSnapshotSchema = new mongoose.Schema(
     numComments: { type: Number, required: true, default: 0 },
     upvoteRatio: { type: Number, default: 0 },
     capturedHour: { type: Number, required: true },
-    capturedAt: { type: Date, required: true, index: true },
+    capturedAt: { type: Date, required: true },
   },
   { versionKey: false }
 );

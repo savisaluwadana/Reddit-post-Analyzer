@@ -84,3 +84,9 @@
 .page-header-wrap { padding-bottom: 0; }
 .page-header-wrap .page-header { margin-bottom: 0; }
 .page-header-wrap ~ .page { padding-top: 1.5rem; }
+
+.reddit-notice { padding: 1.25rem; margin-bottom: 1.2rem; }
+.reddit-notice.alert { border-color: rgba(255, 90, 31, 0.4); }
+.reddit-notice h3 { margin: 0.25rem 0 0.4rem; }
+.reddit-notice code { font-family: var(--font-mono); font-size: 0.8em; padding: 0.1rem 0.3rem; background: var(--panel-soft); border-radius: 4px; }
+.reddit-notice a { color: var(--reddit-orange); text-decoration: underline; }

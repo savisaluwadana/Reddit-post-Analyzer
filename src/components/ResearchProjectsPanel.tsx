@@ -76,17 +76,23 @@ export function ResearchProjectsPanel({
           </div>
         </div>
 
+        <p className="empty-copy">
+          This does not fetch anything. It saves the subreddits, date filters and settings above so you can reload them with one click.
+          Keywords filter the posts you fetched (a post must contain at least one); leave them empty to keep all posts.
+          Description is only a note for yourself.
+        </p>
+
         <div className="project-form-grid">
           <label className="field-group">
             <span>Project name</span>
             <input className="input-base" value={name} onChange={(event) => setName(event.target.value)} placeholder="Kubernetes platform pain points" />
           </label>
           <label className="field-group">
-            <span>Keywords, comma separated</span>
+            <span>Keywords to filter posts (optional)</span>
             <input className="input-base" value={keywords} onChange={(event) => setKeywords(event.target.value)} placeholder={query || 'cost, migration, alternatives'} />
           </label>
           <label className="field-group project-description-field">
-            <span>Description</span>
+            <span>Note for yourself (optional)</span>
             <input className="input-base" value={description} onChange={(event) => setDescription(event.target.value)} placeholder="What you are trying to learn or validate" />
           </label>
         </div>
