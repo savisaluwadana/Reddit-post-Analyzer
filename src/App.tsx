@@ -2,6 +2,7 @@ import { useEffect, useMemo, useState } from 'react';
 import { Controls } from './components/Controls';
 import { CrossSourceIntelligencePanel } from './components/CrossSourceIntelligencePanel';
 import { CsvVisualizer } from './components/CsvVisualizer';
+import { Dashboard } from './components/Dashboard';
 import { HostIntelligencePanel } from './components/HostIntelligencePanel';
 import { IntelligencePanel } from './components/IntelligencePanel';
 import { OpportunityOsPanel } from './components/OpportunityOsPanel';
@@ -13,6 +14,7 @@ import { ResearchToolbar } from './components/ResearchToolbar';
 import { ScrapeIntelligencePanel } from './components/ScrapeIntelligencePanel';
 import { StatsBar } from './components/StatsBar';
 import { TrendPanel } from './components/TrendPanel';
+import { PAGES, type PageId } from './pages';
 import type {
   RedditPost,
   ResearchProject,
@@ -33,7 +35,20 @@ import {
 } from './utils/researchApi';
 import { fetchAllPosts } from './utils/redditApi';
 
+function readPageFromHash(): PageId {
+  const hash = window.location.hash.replace(/^#\/?/, '');
+  return PAGES.some((candidate) => candidate.id === hash) ? (hash as PageId) : 'home';
+}
+
 function App() {
+  const [page, setPage] = useState<PageId>(readPageFromHash);
+
+  useEffect(() => {
+    const onHashChange = () => setPage(readPageFromHash());
+    window.addEventListener('hashchange', onHashChange);
+    return () => window.removeEventListener('hashchange', onHashChange);
+  }, []);
+
   const [subreddits, setSubreddits] = useState<string[]>(['reactjs', 'webdev']);
 
   const defaultFrom = new Date();
@@ -212,102 +227,141 @@ function App() {
     void refreshTrends(trendDays, trendSubreddit);
   };
 
+  const navigate = (next: PageId) => {
+    window.location.hash = next === 'home' ? '' : next;
+    window.scrollTo({ top: 0 });
+  };
+
+  const pageDef = PAGES.find((candidate) => candidate.id === page);
+
   return (
-    <div className="container app-shell">
-      <header className="hero-header">
-        <div className="hero-kicker">Cross-source pain intelligence</div>
-        <h1 className="header-title">Pain Intelligence Lab</h1>
-        <p className="header-desc">
-          Turn public conversations, reviews, forums, issues, support threads and community discussions into evidence-backed pain points, jobs-to-be-done, competitor intelligence and product opportunities.
-        </p>
-        <div className="hero-note">MCP-hosted LLM reasoning • No model API key • Adaptive public-web crawl intelligence • Semantic clustering • Validation experiments • Opportunity OS</div>
-      </header>
+    <div className="layout">
+      <aside className="sidebar">
+        <button type="button" className="sidebar-brand" onClick={() => navigate('home')}>
+          <strong>Pain Intelligence Lab</strong>
+          <span>Research platform</span>
+        </button>
+        <nav className="sidebar-nav" aria-label="Main">
+          <button
+            type="button"
+            className={page === 'home' ? 'nav-item active' : 'nav-item'}
+            onClick={() => navigate('home')}
+          >
+            <span className="nav-icon" aria-hidden="true">⌂</span>Home
+          </button>
+          <div className="nav-label">Features</div>
+          {PAGES.map((item) => (
+            <button
+              type="button"
+              key={item.id}
+              className={page === item.id ? 'nav-item active' : 'nav-item'}
+              onClick={() => navigate(item.id)}
+            >
+              <span className="nav-icon" aria-hidden="true">{item.icon}</span>{item.label}
+            </button>
+          ))}
+        </nav>
+      </aside>
 
       <main>
-        <CrossSourceIntelligencePanel />
-        <HostIntelligencePanel />
-        <ScrapeIntelligencePanel />
-        <QualityIntelligencePanel />
-        <OpportunityOsPanel />
+        {pageDef && (
+          <header className="page page-header-wrap">
+            <div className="page-header">
+              <div className="eyebrow">{pageDef.needsHost ? 'Needs a connected research host' : 'Works on its own'}</div>
+              <h1>{pageDef.label}</h1>
+              <p>{pageDef.summary}</p>
+            </div>
+          </header>
+        )}
 
-        <div className="source-connector-divider">
-          <span>Built-in source connector</span>
-          <strong>Reddit deep research</strong>
-          <p>Use the native Reddit collector below, or use Codex / Claude Code through MCP to research any public source and feed the cross-source evidence layer above.</p>
-        </div>
+        <section className="page" hidden={page !== 'home'}>
+          <header className="page-header">
+            <div className="eyebrow">Cross-source pain intelligence</div>
+            <h1>Dashboard</h1>
+            <p>Turn public conversations, reviews and forum threads into evidence-backed pain points and product opportunities. Pick a feature below.</p>
+          </header>
+          <Dashboard onNavigate={navigate} postCount={posts.length} projectCount={projects.length} />
+        </section>
 
-        <Controls
-          subreddits={subreddits}
-          setSubreddits={setSubreddits}
-          fromDate={fromDate}
-          setFromDate={setFromDate}
-          toDate={toDate}
-          setToDate={setToDate}
-          limit={limit}
-          setLimit={setLimit}
-          onFetch={handleFetch}
-          isLoading={isLoading}
-        />
-
-        <ResearchProjectsPanel
-          projects={projects}
-          subreddits={subreddits}
-          query={query}
-          minScore={minScore}
-          minComments={minComments}
-          signalFilter={signalFilter}
-          sortMode={sortMode}
-          onCreate={handleCreateProject}
-          onLoad={handleLoadProject}
-          onDelete={handleDeleteProject}
-          isLoading={isProjectLoading}
-        />
-
-        <TrendPanel
-          trend={trend}
-          days={trendDays}
-          setDays={setTrendDays}
-          subreddit={trendSubreddit}
-          setSubreddit={setTrendSubreddit}
-          availableSubreddits={availableSubreddits}
-          isLoading={isTrendLoading}
-          onRefresh={handleTrendRefresh}
-        />
-
-        {stats && (
-          <StatsBar
-            stats={stats}
-            posts={displayedPosts}
-            errors={errors}
-            onSaveData={handleSaveData}
-            isSavingData={isSavingData}
-            saveMessage={saveMessage}
+        <section className="page" hidden={page !== 'reddit'}>
+          <Controls
+            subreddits={subreddits}
+            setSubreddits={setSubreddits}
+            fromDate={fromDate}
+            setFromDate={setFromDate}
+            toDate={toDate}
+            setToDate={setToDate}
+            limit={limit}
+            setLimit={setLimit}
+            onFetch={handleFetch}
+            isLoading={isLoading}
           />
-        )}
 
-        {posts.length > 0 && (
-          <>
-            <ResearchToolbar
-              query={query}
-              setQuery={setQuery}
-              sortMode={sortMode}
-              setSortMode={setSortMode}
-              signalFilter={signalFilter}
-              setSignalFilter={setSignalFilter}
-              minScore={minScore}
-              setMinScore={setMinScore}
-              minComments={minComments}
-              setMinComments={setMinComments}
-              resultCount={displayedPosts.length}
+          <ResearchProjectsPanel
+            projects={projects}
+            subreddits={subreddits}
+            query={query}
+            minScore={minScore}
+            minComments={minComments}
+            signalFilter={signalFilter}
+            sortMode={sortMode}
+            onCreate={handleCreateProject}
+            onLoad={handleLoadProject}
+            onDelete={handleDeleteProject}
+            isLoading={isProjectLoading}
+          />
+
+          <TrendPanel
+            trend={trend}
+            days={trendDays}
+            setDays={setTrendDays}
+            subreddit={trendSubreddit}
+            setSubreddit={setTrendSubreddit}
+            availableSubreddits={availableSubreddits}
+            isLoading={isTrendLoading}
+            onRefresh={handleTrendRefresh}
+          />
+
+          {stats && (
+            <StatsBar
+              stats={stats}
+              posts={displayedPosts}
+              errors={errors}
+              onSaveData={handleSaveData}
+              isSavingData={isSavingData}
+              saveMessage={saveMessage}
             />
-            <IntelligencePanel insights={insights} posts={displayedPosts} />
-            <PainPointLab posts={displayedPosts} />
-          </>
-        )}
+          )}
 
-        <PostList posts={displayedPosts} errors={errors} />
+          {posts.length > 0 && (
+            <>
+              <ResearchToolbar
+                query={query}
+                setQuery={setQuery}
+                sortMode={sortMode}
+                setSortMode={setSortMode}
+                signalFilter={signalFilter}
+                setSignalFilter={setSignalFilter}
+                minScore={minScore}
+                setMinScore={setMinScore}
+                minComments={minComments}
+                setMinComments={setMinComments}
+                resultCount={displayedPosts.length}
+              />
+              <IntelligencePanel insights={insights} posts={displayedPosts} />
+              <PainPointLab posts={displayedPosts} />
+            </>
+          )}
 
-        <CsvVisualizer />
+          <PostList posts={displayedPosts} errors={errors} />
+        </section>
+
+        <section className="page" hidden={page !== 'evidence'}><CrossSourceIntelligencePanel /></section>
+        <section className="page" hidden={page !== 'research'}><HostIntelligencePanel /></section>
+        <section className="page" hidden={page !== 'scraping'}><ScrapeIntelligencePanel /></section>
+        <section className="page" hidden={page !== 'quality'}><QualityIntelligencePanel /></section>
+        <section className="page" hidden={page !== 'opportunities'}><OpportunityOsPanel /></section>
+        <section className="page" hidden={page !== 'csv'}><CsvVisualizer /></section>
       </main>
     </div>
   );

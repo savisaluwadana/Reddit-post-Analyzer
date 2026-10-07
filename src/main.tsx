@@ -10,6 +10,7 @@ import './opportunity-os.css'
 import './scrape-intelligence.css'
 import './pain.css'
 import './pain-history.css'
+import './navigation.css'
 import App from './App.tsx'
 
 createRoot(document.getElementById('root')!).render(
